@@ -3,7 +3,7 @@
 Project: Pose Backend (Node.js + Express + MongoDB) & Dashboard (Next.js)
 Version: 1.0.0
 Maintainer: Pose AI Agent System
-Ngày cập nhật: 2025-10-04 (UTC+7)
+Ngày cập nhật: 2025-10-04 (UTC+7) - Sprint 1 Completed
 
 0) Bối cảnh & Phạm vi
 
@@ -121,13 +121,13 @@ M5 – Vận hành	2025-10-25 → 2025-10-30	Deploy VPS, backup, tài liệu v�
 Từng milestone sẽ được chi tiết trong các sprint-1.md, sprint-2.md, sprint-3.md (đợt 1 gồm 3 sprint).
 
 5) Kế hoạch Sprint (Wave 1: 3 Sprint)
-Sprint 1 — Backend Core Setup & Auth
+Sprint 1 — Backend Core Setup & Auth ✅ COMPLETED
 
-Thời gian: 2025-10-01 → 2025-10-05
+Thời gian: 2025-10-01 → 2025-10-04 (Hoàn thành sớm)
 
 Mục tiêu: khung dự án, config, models, auth flow (JWT admin/editor), static token cho public, middlewares & error handling, rate limiter nền tảng.
 
-Kết quả: đăng nhập admin/editor, verify role; verify static token; unit tests chính cho auth & middlewares.
+Kết quả: ✅ đăng nhập admin/editor, verify role; verify static token; unit tests chính cho auth & middlewares. Tất cả tests pass (8/8), server hoạt động ổn định.
 
 Sprint 2 — Categories & Images
 
