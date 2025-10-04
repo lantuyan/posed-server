@@ -12,6 +12,9 @@ const { apiLimiter } = require('./middlewares/rateLimiter');
 
 // Import routes
 const adminRoutes = require('./routes/adminRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
+const imageRoutes = require('./routes/imageRoutes');
+const publicRoutes = require('./routes/publicRoutes');
 
 const app = express();
 
@@ -49,6 +52,9 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Routes
 app.use('/api/admin', adminRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/images', imageRoutes);
+app.use('/api/public', publicRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

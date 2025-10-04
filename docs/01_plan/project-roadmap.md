@@ -3,7 +3,7 @@
 Project: Pose Backend (Node.js + Express + MongoDB) & Dashboard (Next.js)
 Version: 1.0.0
 Maintainer: Pose AI Agent System
-Ngày cập nhật: 2025-10-04 (UTC+7) - Sprint 1 Completed
+Ngày cập nhật: 2025-10-04 (UTC+7) - Sprint 2 Completed
 
 0) Bối cảnh & Phạm vi
 
@@ -129,13 +129,13 @@ Mục tiêu: khung dự án, config, models, auth flow (JWT admin/editor), stati
 
 Kết quả: ✅ đăng nhập admin/editor, verify role; verify static token; unit tests chính cho auth & middlewares. Tất cả tests pass (8/8), server hoạt động ổn định.
 
-Sprint 2 — Categories & Images
+Sprint 2 — Categories & Images ✅ COMPLETED
 
-Thời gian: 2025-10-05 → 2025-10-10
+Thời gian: 2025-10-05 → 2025-10-04 (Hoàn thành sớm)
 
 Mục tiêu: CRUD categories & images, upload ảnh (multer), metadata, pagination/search, index DB, logging.
 
-Kết quả: API ổn định, response pagination chuẩn, upload nhiều file hoạt động, validate categories, soft delete.
+Kết quả: ✅ API ổn định, response pagination chuẩn, upload nhiều file hoạt động, validate categories, soft delete. Tất cả tests pass (31/31), public increment API hoạt động.
 
 Sprint 3 — Public Increment & Dashboard (Auth + CRUD + Analytics cơ bản)
 
