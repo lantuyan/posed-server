@@ -5,23 +5,183 @@ const categoryController = require('../controllers/categoryController');
 const { verifyAdminOrEditor, verifyStaticUser } = require('../middlewares/authJwt');
 const { validateCategory, validateObjectId, validatePagination } = require('../middlewares/validateRequest');
 
-// Category routes
-
-// POST /api/categories - Create category (admin/editor only)
+/**
+ * @swagger
+ * /api/categories:
+ *   post:
+ *     summary: Create a new category
+ *     description: Create a new category (admin/editor only)
+ *     tags: [Categories]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CategoryRequest'
+ *     responses:
+ *       201:
+ *         description: Category created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 category:
+ *                   $ref: '#/components/schemas/Category'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.post('/', 
   verifyAdminOrEditor, 
   validateCategory, 
   categoryController.createCategory
 );
 
-// GET /api/categories - Get all categories (public)
+/**
+ * @swagger
+ * /api/categories:
+ *   get:
+ *     summary: Get all categories
+ *     description: Get paginated list of all active categories (public)
+ *     tags: [Categories]
+ *     security:
+ *       - StaticTokenAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *         description: Number of items per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search term for title and description
+ *     responses:
+ *       200:
+ *         description: Categories retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Pagination'
+ *                 - type: object
+ *                   properties:
+ *                     items:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/Category'
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.get('/', 
   verifyStaticUser, 
   validatePagination, 
   categoryController.getCategories
 );
 
-// GET /api/categories/:id - Get category by ID with images (public)
+/**
+ * @swagger
+ * /api/categories/{id}:
+ *   get:
+ *     summary: Get category by ID
+ *     description: Get category details with associated images (public)
+ *     tags: [Categories]
+ *     security:
+ *       - StaticTokenAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Category ID
+ *       - in: query
+ *         name: imagesPage
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number for images
+ *       - in: query
+ *         name: imagesLimit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *         description: Number of images per page
+ *       - in: query
+ *         name: imagesSearch
+ *         schema:
+ *           type: string
+ *         description: Search term for images
+ *     responses:
+ *       200:
+ *         description: Category retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 category:
+ *                   allOf:
+ *                     - $ref: '#/components/schemas/Category'
+ *                     - type: object
+ *                       properties:
+ *                         images:
+ *                           $ref: '#/components/schemas/Pagination'
+ *       400:
+ *         description: Invalid category ID or too many images (use pagination)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Category not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.get('/:id', 
   verifyStaticUser, 
   validateObjectId, 
@@ -29,7 +189,60 @@ router.get('/:id',
   categoryController.getCategoryById
 );
 
-// PUT /api/categories/:id - Update category (admin/editor only)
+/**
+ * @swagger
+ * /api/categories/{id}:
+ *   put:
+ *     summary: Update category
+ *     description: Update category details (admin/editor only)
+ *     tags: [Categories]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Category ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CategoryRequest'
+ *     responses:
+ *       200:
+ *         description: Category updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 category:
+ *                   $ref: '#/components/schemas/Category'
+ *       400:
+ *         description: Validation error or invalid category ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Category not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.put('/:id', 
   verifyAdminOrEditor, 
   validateObjectId, 
@@ -37,7 +250,55 @@ router.put('/:id',
   categoryController.updateCategory
 );
 
-// DELETE /api/categories/:id - Soft delete category (admin/editor only)
+/**
+ * @swagger
+ * /api/categories/{id}:
+ *   delete:
+ *     summary: Delete category
+ *     description: Soft delete category (admin/editor only)
+ *     tags: [Categories]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Category ID
+ *     responses:
+ *       200:
+ *         description: Category deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Category deleted successfully"
+ *       400:
+ *         description: Invalid category ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Category not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.delete('/:id', 
   verifyAdminOrEditor, 
   validateObjectId, 

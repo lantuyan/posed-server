@@ -3,7 +3,7 @@
 Project: Pose Backend (Node.js + Express + MongoDB) & Dashboard (Next.js)
 Version: 1.0.0
 Maintainer: Pose AI Agent System
-Ngày cập nhật: 2025-10-04 (UTC+7) - Sprint 2 Completed
+Ngày cập nhật: 2025-10-04 (UTC+7) - Sprint 2 Completed + Swagger Documentation
 
 0) Bối cảnh & Phạm vi
 
@@ -272,3 +272,5 @@ Functional & API Spec: xem requirements.md để nắm đích xác endpoints và
 Kiến trúc & Triển khai: xem implementation-guide.md (layout code, models, middleware, routes, config).
 
 Libs & Best Practices: reference.md (JWT, multer, $inc, rate limiting, validation, logging).
+
+**Swagger Documentation**: Đã tích hợp Swagger UI tại `/api-docs/` để dễ dàng test và kiểm tra tất cả API endpoints. Xem `SWAGGER_GUIDE.md` để biết cách sử dụng.

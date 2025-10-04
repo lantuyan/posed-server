@@ -12,7 +12,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "setup:admin": "node scripts/setup-admin.js",
-    "check-env": "node scripts/check-env.js"
+    "check-env": "node scripts/check-env.js",
+    "docs": "echo 'Swagger UI available at: http://localhost:3000/api-docs/'"
   },
   "keywords": [],
   "author": "",
@@ -30,6 +31,8 @@
     "mongoose": "^8.19.0",
     "multer": "^2.0.2",
     "sharp": "^0.34.4",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
     "uuid": "^13.0.0",
     "winston": "^3.18.3"
   },

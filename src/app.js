@@ -4,11 +4,13 @@ const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
 const fs = require('fs');
+const swaggerUi = require('swagger-ui-express');
 
 const config = require('./config');
 const logger = require('./utils/logger');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
 const { apiLimiter } = require('./middlewares/rateLimiter');
+const swaggerSpecs = require('./config/swagger');
 
 // Import routes
 const adminRoutes = require('./routes/adminRoutes');
@@ -49,6 +51,20 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
   logger.info(`Created uploads directory: ${uploadsDir}`);
 }
+
+// Swagger documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'Pose Backend API Documentation',
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+    docExpansion: 'none',
+    filter: true,
+    showRequestHeaders: true,
+    tryItOutEnabled: true
+  }
+}));
 
 // Routes
 app.use('/api/admin', adminRoutes);

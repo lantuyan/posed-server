@@ -8,6 +8,67 @@ const { incrementLimiter } = require('../middlewares/rateLimiter');
 const logger = require('../utils/logger');
 
 /**
+ * @swagger
+ * /api/public/images/{id}/increment:
+ *   post:
+ *     summary: Increment image counters
+ *     description: Atomically increment image usage and/or favorite counters (public with static token)
+ *     tags: [Public]
+ *     security:
+ *       - StaticTokenAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Image ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/IncrementRequest'
+ *     responses:
+ *       200:
+ *         description: Counters incremented successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/IncrementResponse'
+ *       400:
+ *         description: Invalid request or image ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Image not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       429:
+ *         description: Rate limit exceeded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
+/**
  * Increment image counters (usage/favorite)
  */
 const incrementImageCounters = async (req, res) => {
