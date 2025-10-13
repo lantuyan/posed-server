@@ -62,8 +62,14 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs, {
     docExpansion: 'none',
     filter: true,
     showRequestHeaders: true,
-    tryItOutEnabled: true
-  }
+    tryItOutEnabled: true,
+    url: `http://${process.env.API_HOST || '103.21.148.74'}:${process.env.PORT || 3003}/api-docs/swagger.json`
+  },
+  customJs: [
+    'https://unpkg.com/swagger-ui-dist@5.0.0/swagger-ui-bundle.js',
+    'https://unpkg.com/swagger-ui-dist@5.0.0/swagger-ui-standalone-preset.js'
+  ],
+  customCssUrl: 'https://unpkg.com/swagger-ui-dist@5.0.0/swagger-ui.css'
 }));
 
 // Routes
