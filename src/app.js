@@ -20,22 +20,13 @@ const publicRoutes = require('./routes/publicRoutes');
 
 const app = express();
 
-// Security middleware
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'"],
-      objectSrc: ["'none'"],
-      mediaSrc: ["'self'"],
-      frameSrc: ["'none'"],
-    },
-  },
-}));
+// Security middleware - skip for Swagger routes
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api-docs')) {
+    return next();
+  }
+  helmet()(req, res, next);
+});
 
 // CORS configuration
 app.use(cors({
@@ -66,8 +57,15 @@ if (!fs.existsSync(uploadsDir)) {
   logger.info(`Created uploads directory: ${uploadsDir}`);
 }
 
-// Swagger documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs, {
+// Swagger documentation with HTTP headers
+app.use('/api-docs', (req, res, next) => {
+  // Remove security headers for Swagger
+  res.removeHeader('Cross-Origin-Opener-Policy');
+  res.removeHeader('Cross-Origin-Resource-Policy');
+  res.removeHeader('Origin-Agent-Cluster');
+  res.removeHeader('Strict-Transport-Security');
+  next();
+}, swaggerUi.serve, swaggerUi.setup(swaggerSpecs, {
   customCss: '.swagger-ui .topbar { display: none }',
   customSiteTitle: 'Pose Backend API Documentation',
   swaggerOptions: {
