@@ -21,7 +21,21 @@ const publicRoutes = require('./routes/publicRoutes');
 const app = express();
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+}));
 
 // CORS configuration
 app.use(cors({
@@ -62,14 +76,8 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs, {
     docExpansion: 'none',
     filter: true,
     showRequestHeaders: true,
-    tryItOutEnabled: true,
-    url: `http://${process.env.API_HOST || '103.21.148.74'}:${process.env.PORT || 3003}/api-docs/swagger.json`
-  },
-  customJs: [
-    'https://unpkg.com/swagger-ui-dist@5.0.0/swagger-ui-bundle.js',
-    'https://unpkg.com/swagger-ui-dist@5.0.0/swagger-ui-standalone-preset.js'
-  ],
-  customCssUrl: 'https://unpkg.com/swagger-ui-dist@5.0.0/swagger-ui.css'
+    tryItOutEnabled: true
+  }
 }));
 
 // Routes
