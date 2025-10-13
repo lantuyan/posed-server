@@ -5,6 +5,7 @@ const { asyncHandler } = require('../middlewares/errorHandler');
 const { validateImageMetadata, validateObjectId, validatePagination } = require('../middlewares/validateRequest');
 const logger = require('../utils/logger');
 const config = require('../config');
+const { getImageUrl } = require('../utils/urlHelper');
 
 /**
  * Upload images
@@ -68,7 +69,7 @@ const uploadImages = asyncHandler(async (req, res) => {
         title: image.title,
         description: image.description,
         fileName: image.fileName,
-        filePath: image.filePath,
+        filePath: getImageUrl(image.filePath),
         mimeType: image.mimeType,
         size: image.size,
         width: image.width,
@@ -175,7 +176,7 @@ const getImages = asyncHandler(async (req, res) => {
       title: image.title,
       description: image.description,
       fileName: image.fileName,
-      filePath: image.filePath,
+      filePath: getImageUrl(image.filePath),
       mimeType: image.mimeType,
       size: image.size,
       width: image.width,
@@ -230,7 +231,7 @@ const getImageById = asyncHandler(async (req, res) => {
       title: image.title,
       description: image.description,
       fileName: image.fileName,
-      filePath: image.filePath,
+      filePath: getImageUrl(image.filePath),
       mimeType: image.mimeType,
       size: image.size,
       width: image.width,
@@ -304,7 +305,7 @@ const updateImage = asyncHandler(async (req, res) => {
       title: image.title,
       description: image.description,
       fileName: image.fileName,
-      filePath: image.filePath,
+      filePath: getImageUrl(image.filePath),
       mimeType: image.mimeType,
       size: image.size,
       width: image.width,

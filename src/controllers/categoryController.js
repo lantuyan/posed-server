@@ -4,6 +4,7 @@ const { asyncHandler } = require('../middlewares/errorHandler');
 const { validateCategory, validateObjectId, validatePagination } = require('../middlewares/validateRequest');
 const logger = require('../utils/logger');
 const config = require('../config');
+const { getImageUrl } = require('../utils/urlHelper');
 
 /**
  * Create a new category
@@ -174,7 +175,7 @@ const getCategoryById = asyncHandler(async (req, res) => {
       title: image.title,
       description: image.description,
       fileName: image.fileName,
-      filePath: image.filePath,
+      filePath: getImageUrl(image.filePath),
       mimeType: image.mimeType,
       size: image.size,
       width: image.width,
