@@ -41,6 +41,41 @@ app.use(apiLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(process.cwd(), config.uploadPath);
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+  logger.info(`Created uploads directory: ${uploadsDir}`);
+}
+
+logger.info(`Serving static files from: ${uploadsDir}`);
+logger.info(`Static files accessible at: /uploads/*`);
+
+// Serve static files from uploads directory (must be before other routes)
+app.use('/uploads', express.static(uploadsDir, {
+  index: false,
+  dotfiles: 'ignore'
+}));
+
+// Alternative route for serving images (fallback)
+app.get('/uploads/images/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.join(uploadsDir, filename);
+  
+  logger.info(`Serving image: ${filename} from ${filePath}`);
+  
+  // Check if file exists
+  if (fs.existsSync(filePath)) {
+    res.sendFile(filePath);
+  } else {
+    logger.warn(`Image not found: ${filePath}`);
+    res.status(404).json({
+      success: false,
+      error: 'Image not found'
+    });
+  }
+});
+
 // Request logging middleware
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.url}`, {
@@ -49,13 +84,6 @@ app.use((req, res, next) => {
   });
   next();
 });
-
-// Create uploads directory if it doesn't exist
-const uploadsDir = path.join(process.cwd(), config.uploadPath);
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-  logger.info(`Created uploads directory: ${uploadsDir}`);
-}
 
 // Swagger documentation with HTTP headers
 app.use('/api-docs', (req, res, next) => {
