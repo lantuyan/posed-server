@@ -21,8 +21,18 @@ module.exports = {
   
   // Rate Limiting
   rateLimit: {
-    windowMs: 60 * 1000, // 1 minute
-    maxRequests: parseInt(process.env.INCR_MAX_PER_MINUTE || '60')
+    // General API rate limiting
+    enabled: process.env.RATE_LIMIT_ENABLED !== 'false', // Default: enabled
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes default
+    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '1000'), // 1000 requests per window default
+    
+    // Increment API rate limiting
+    incrementWindowMs: parseInt(process.env.INCR_RATE_LIMIT_WINDOW_MS || '60000'), // 1 minute default
+    incrementMaxRequests: parseInt(process.env.INCR_MAX_PER_MINUTE || '60'),
+    
+    // Login rate limiting
+    loginWindowMs: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes default
+    loginMaxRequests: parseInt(process.env.LOGIN_RATE_LIMIT_MAX_REQUESTS || '5')
   },
   
   // Server Configuration

@@ -34,8 +34,16 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
-app.use(apiLimiter);
+// Rate limiting - Configurable via .env
+if (config.rateLimit.enabled) {
+  app.use(apiLimiter);
+  logger.info('Rate limiting enabled', {
+    windowMs: config.rateLimit.windowMs,
+    maxRequests: config.rateLimit.maxRequests
+  });
+} else {
+  logger.info('Rate limiting disabled');
+}
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

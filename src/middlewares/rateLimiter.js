@@ -6,8 +6,8 @@ const logger = require('../utils/logger');
  * Rate limiter for increment API
  */
 const incrementLimiter = rateLimit({
-  windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.maxRequests,
+  windowMs: config.rateLimit.incrementWindowMs,
+  max: config.rateLimit.incrementMaxRequests,
   message: {
     success: false,
     error: 'Too many requests, please slow down'
@@ -32,8 +32,8 @@ const incrementLimiter = rateLimit({
  * Rate limiter for login attempts
  */
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per window
+  windowMs: config.rateLimit.loginWindowMs,
+  max: config.rateLimit.loginMaxRequests,
   message: {
     success: false,
     error: 'Too many login attempts, please try again later'
@@ -58,8 +58,8 @@ const loginLimiter = rateLimit({
  * General API rate limiter
  */
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requests per window
+  windowMs: config.rateLimit.windowMs,
+  max: config.rateLimit.maxRequests,
   message: {
     success: false,
     error: 'Too many requests from this IP, please try again later'
