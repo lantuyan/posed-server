@@ -5,16 +5,33 @@ const { validateCategory, validateObjectId, validatePagination } = require('../m
 const logger = require('../utils/logger');
 const config = require('../config');
 const { getImageUrl } = require('../utils/urlHelper');
+const imageService = require('../services/imageService');
 
 /**
  * Create a new category
  */
 const createCategory = asyncHandler(async (req, res) => {
   const { title, description, status = true } = req.body;
+  const files = req.files;
+
+  // Handle file uploads
+  let iconPath = null;
+  let thumbnailPath = null;
+
+  if (files) {
+    if (files.icon && files.icon[0]) {
+      iconPath = files.icon[0].path;
+    }
+    if (files.thumbnail && files.thumbnail[0]) {
+      thumbnailPath = files.thumbnail[0].path;
+    }
+  }
 
   const category = new Category({
     title,
     description,
+    icon: iconPath,
+    thumbnail: thumbnailPath,
     status
   });
 
@@ -32,6 +49,8 @@ const createCategory = asyncHandler(async (req, res) => {
       id: category._id,
       title: category.title,
       description: category.description,
+      icon: category.icon ? getImageUrl(category.icon) : null,
+      thumbnail: category.thumbnail ? getImageUrl(category.thumbnail) : null,
       status: category.status,
       createdAt: category.createdAt,
       updatedAt: category.updatedAt
@@ -67,7 +86,7 @@ const getCategories = asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)
-    .select('title description status createdAt updatedAt');
+    .select('title description icon thumbnail status createdAt updatedAt');
 
   logger.info('Categories retrieved', {
     totalItems,
@@ -86,6 +105,8 @@ const getCategories = asyncHandler(async (req, res) => {
       id: category._id,
       title: category.title,
       description: category.description,
+      icon: category.icon ? getImageUrl(category.icon) : null,
+      thumbnail: category.thumbnail ? getImageUrl(category.thumbnail) : null,
       status: category.status,
       createdAt: category.createdAt,
       updatedAt: category.updatedAt
@@ -166,6 +187,8 @@ const getCategoryById = asyncHandler(async (req, res) => {
       id: category._id,
       title: category.title,
       description: category.description,
+      icon: category.icon ? getImageUrl(category.icon) : null,
+      thumbnail: category.thumbnail ? getImageUrl(category.thumbnail) : null,
       status: category.status,
       createdAt: category.createdAt,
       updatedAt: category.updatedAt
@@ -195,6 +218,7 @@ const getCategoryById = asyncHandler(async (req, res) => {
 const updateCategory = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { title, description, status } = req.body;
+  const files = req.files;
 
   const category = await Category.findById(id);
   if (!category) {
@@ -202,6 +226,24 @@ const updateCategory = asyncHandler(async (req, res) => {
       success: false,
       error: 'Category not found'
     });
+  }
+
+  // Handle file uploads and cleanup old files
+  if (files) {
+    if (files.icon && files.icon[0]) {
+      // Delete old icon file if exists
+      if (category.icon) {
+        await imageService.deleteImageFile(category.icon);
+      }
+      category.icon = files.icon[0].path;
+    }
+    if (files.thumbnail && files.thumbnail[0]) {
+      // Delete old thumbnail file if exists
+      if (category.thumbnail) {
+        await imageService.deleteImageFile(category.thumbnail);
+      }
+      category.thumbnail = files.thumbnail[0].path;
+    }
   }
 
   // Update fields
@@ -223,6 +265,70 @@ const updateCategory = asyncHandler(async (req, res) => {
       id: category._id,
       title: category.title,
       description: category.description,
+      icon: category.icon ? getImageUrl(category.icon) : null,
+      thumbnail: category.thumbnail ? getImageUrl(category.thumbnail) : null,
+      status: category.status,
+      createdAt: category.createdAt,
+      updatedAt: category.updatedAt
+    }
+  });
+});
+
+/**
+ * Edit category (PATCH - partial update)
+ */
+const editCategory = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { title, description, status } = req.body;
+  const files = req.files;
+
+  const category = await Category.findById(id);
+  if (!category) {
+    return res.status(404).json({
+      success: false,
+      error: 'Category not found'
+    });
+  }
+
+  // Handle file uploads and cleanup old files
+  if (files) {
+    if (files.icon && files.icon[0]) {
+      // Delete old icon file if exists
+      if (category.icon) {
+        await imageService.deleteImageFile(category.icon);
+      }
+      category.icon = files.icon[0].path;
+    }
+    if (files.thumbnail && files.thumbnail[0]) {
+      // Delete old thumbnail file if exists
+      if (category.thumbnail) {
+        await imageService.deleteImageFile(category.thumbnail);
+      }
+      category.thumbnail = files.thumbnail[0].path;
+    }
+  }
+
+  // Update fields (all optional for PATCH)
+  if (title !== undefined) category.title = title;
+  if (description !== undefined) category.description = description;
+  if (status !== undefined) category.status = status;
+
+  await category.save();
+
+  logger.info('Category edited', {
+    categoryId: id,
+    title: category.title,
+    userId: req.user?.userId
+  });
+
+  res.json({
+    success: true,
+    category: {
+      id: category._id,
+      title: category.title,
+      description: category.description,
+      icon: category.icon ? getImageUrl(category.icon) : null,
+      thumbnail: category.thumbnail ? getImageUrl(category.thumbnail) : null,
       status: category.status,
       createdAt: category.createdAt,
       updatedAt: category.updatedAt
@@ -242,6 +348,14 @@ const deleteCategory = asyncHandler(async (req, res) => {
       success: false,
       error: 'Category not found'
     });
+  }
+
+  // Delete associated files
+  if (category.icon) {
+    await imageService.deleteImageFile(category.icon);
+  }
+  if (category.thumbnail) {
+    await imageService.deleteImageFile(category.thumbnail);
   }
 
   // Soft delete
@@ -265,5 +379,6 @@ module.exports = {
   getCategories,
   getCategoryById,
   updateCategory,
+  editCategory,
   deleteCategory
 };

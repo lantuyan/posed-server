@@ -75,6 +75,30 @@ const validateCategory = [
 ];
 
 /**
+ * Validation rules for category partial update (PATCH)
+ */
+const validateCategoryEdit = [
+  body('title')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Title must be between 1 and 100 characters'),
+  
+  body('description')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Description must not exceed 500 characters'),
+  
+  body('status')
+    .optional()
+    .isBoolean()
+    .withMessage('Status must be a boolean value'),
+  
+  handleValidationErrors
+];
+
+/**
  * Validation rules for image metadata update
  */
 const validateImageMetadata = [
@@ -175,6 +199,7 @@ module.exports = {
   handleValidationErrors,
   validateLogin,
   validateCategory,
+  validateCategoryEdit,
   validateImageMetadata,
   validateIncrement,
   validateObjectId,

@@ -13,6 +13,14 @@ const CategorySchema = new mongoose.Schema({
     trim: true,
     maxlength: 500
   },
+  icon: {
+    type: String,
+    trim: true
+  },
+  thumbnail: {
+    type: String,
+    trim: true
+  },
   status: { 
     type: Boolean, 
     default: true 

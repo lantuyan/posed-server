@@ -3,7 +3,8 @@ const router = express.Router();
 
 const categoryController = require('../controllers/categoryController');
 const { verifyAdminOrEditor, verifyStaticUser } = require('../middlewares/authJwt');
-const { validateCategory, validateObjectId, validatePagination } = require('../middlewares/validateRequest');
+const { validateCategory, validateCategoryEdit, validateObjectId, validatePagination } = require('../middlewares/validateRequest');
+const { uploadCategoryFiles, handleUploadError } = require('../middlewares/upload');
 
 /**
  * @swagger
@@ -17,9 +18,26 @@ const { validateCategory, validateObjectId, validatePagination } = require('../m
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
- *             $ref: '#/components/schemas/CategoryRequest'
+ *             type: object
+ *             required:
+ *               - title
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 maxLength: 100
+ *               description:
+ *                 type: string
+ *                 maxLength: 500
+ *               status:
+ *                 type: boolean
+ *               icon:
+ *                 type: string
+ *                 format: binary
+ *               thumbnail:
+ *                 type: string
+ *                 format: binary
  *     responses:
  *       201:
  *         description: Category created successfully
@@ -48,6 +66,8 @@ const { validateCategory, validateObjectId, validatePagination } = require('../m
  */
 router.post('/', 
   verifyAdminOrEditor, 
+  uploadCategoryFiles,
+  handleUploadError,
   validateCategory, 
   categoryController.createCategory
 );
@@ -208,9 +228,26 @@ router.get('/:id',
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
- *             $ref: '#/components/schemas/CategoryRequest'
+ *             type: object
+ *             required:
+ *               - title
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 maxLength: 100
+ *               description:
+ *                 type: string
+ *                 maxLength: 500
+ *               status:
+ *                 type: boolean
+ *               icon:
+ *                 type: string
+ *                 format: binary
+ *               thumbnail:
+ *                 type: string
+ *                 format: binary
  *     responses:
  *       200:
  *         description: Category updated successfully
@@ -246,8 +283,88 @@ router.get('/:id',
 router.put('/:id', 
   verifyAdminOrEditor, 
   validateObjectId, 
+  uploadCategoryFiles,
+  handleUploadError,
   validateCategory, 
   categoryController.updateCategory
+);
+
+/**
+ * @swagger
+ * /api/categories/{id}:
+ *   patch:
+ *     summary: Edit category (partial update)
+ *     description: Partially update category details (admin/editor only)
+ *     tags: [Categories]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Category ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 maxLength: 100
+ *               description:
+ *                 type: string
+ *                 maxLength: 500
+ *               status:
+ *                 type: boolean
+ *               icon:
+ *                 type: string
+ *                 format: binary
+ *               thumbnail:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Category updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 category:
+ *                   $ref: '#/components/schemas/Category'
+ *       400:
+ *         description: Validation error or invalid category ID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Category not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.patch('/:id', 
+  verifyAdminOrEditor, 
+  validateObjectId, 
+  uploadCategoryFiles,
+  handleUploadError,
+  validateCategoryEdit, 
+  categoryController.editCategory
 );
 
 /**

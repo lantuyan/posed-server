@@ -47,6 +47,12 @@ const uploadSingle = upload.single('image');
 // Middleware for multiple files upload
 const uploadMultiple = upload.array('images', 10);
 
+// Middleware for category files upload (icon and thumbnail)
+const uploadCategoryFiles = upload.fields([
+  { name: 'icon', maxCount: 1 },
+  { name: 'thumbnail', maxCount: 1 }
+]);
+
 // Error handler for multer errors
 const handleUploadError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
@@ -85,5 +91,6 @@ const handleUploadError = (err, req, res, next) => {
 module.exports = {
   uploadSingle,
   uploadMultiple,
+  uploadCategoryFiles,
   handleUploadError
 };
