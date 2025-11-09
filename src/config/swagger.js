@@ -30,7 +30,7 @@ const options = {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'token',
-          description: 'Static token for public API access'
+          description: 'Encrypted time-based token for public API access. Token format: Encrypted "STATIC_USER_TOKEN|yyyy-mm-dd hh:mm:ss" using AES-256-CBC. Token must be generated with current timestamp and is valid within ±30 seconds (configurable via USER_TOKEN_EXPIRY_SECONDS). Use the generate-user-token script to create valid tokens.'
         }
       },
       schemas: {

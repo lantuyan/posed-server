@@ -11,6 +11,9 @@ module.exports = {
   // Static User Token for Public API
   staticUserToken: process.env.STATIC_USER_TOKEN,
   
+  // User Token Expiry (in seconds) - Time window for token validation
+  userTokenExpirySeconds: parseInt(process.env.USER_TOKEN_EXPIRY_SECONDS || '30'),
+  
   // Upload Configuration
   uploadPath: process.env.UPLOAD_PATH || 'uploads/images',
   maxImageSizeBytes: parseInt(process.env.MAX_IMAGE_SIZE || '10485760'), // 10 MB

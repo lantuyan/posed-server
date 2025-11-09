@@ -52,7 +52,8 @@ const verifyAdminOrEditor = async (req, res, next) => {
 };
 
 /**
- * Middleware to verify static user token for public routes
+ * Middleware to verify encrypted user token for public routes
+ * Token format: Encrypted "STATIC_USER_TOKEN|yyyy-mm-dd hh:mm:ss" using AES-256-CBC
  */
 const verifyStaticUser = (req, res, next) => {
   try {
@@ -66,19 +67,46 @@ const verifyStaticUser = (req, res, next) => {
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
     
-    if (!authService.verifyStaticToken(token)) {
-      logger.warn('Invalid static token', { 
-        ip: req.ip, 
-        userAgent: req.get('User-Agent') 
+    try {
+      authService.verifyUserToken(token);
+      
+      logger.debug('User token verified', { ip: req.ip });
+      next();
+    } catch (error) {
+      // Handle specific error cases
+      if (error.message === 'Token expired') {
+        logger.warn('Token expired', { 
+          ip: req.ip, 
+          userAgent: req.get('User-Agent') 
+        });
+        
+        return res.status(401).json({ 
+          error: 'Token expired.' 
+        });
+      }
+      
+      if (error.message === 'Invalid token' || error.message === 'Decryption failed') {
+        logger.warn('Invalid user token', { 
+          ip: req.ip, 
+          userAgent: req.get('User-Agent'),
+          error: error.message
+        });
+        
+        return res.status(401).json({ 
+          error: 'Invalid token.' 
+        });
+      }
+      
+      // Other errors
+      logger.error('Token verification error', { 
+        ip: req.ip,
+        error: error.message 
       });
       
       return res.status(401).json({ 
         error: 'Invalid token.' 
       });
     }
-    
-    logger.debug('Static token verified', { ip: req.ip });
-    next();
   } catch (error) {
     logger.error('Static auth middleware error', { error: error.message });
     return res.status(500).json({ 
