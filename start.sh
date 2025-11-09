@@ -174,48 +174,109 @@ if [ ! -f "$CERT_PATH" ]; then
     log_info "Đang cấu hình SSL với Let's Encrypt (hoạt động với Cloudflare)..."
     
     # Kiểm tra xem port 80 có đang được sử dụng không
-    if $SUDO_PREFIX lsof -Pi :80 -sTCP:LISTEN -t >/dev/null 2>&1; then
-        log_warning "Port 80 đang được sử dụng. Đảm bảo Nginx hoặc web server khác đã được cấu hình."
-        log_info "Bạn có thể cần cấu hình Nginx để proxy đến Let's Encrypt validation"
+    PORT80_PID=""
+    PORT80_PROCESS=""
+    if command -v lsof &> /dev/null; then
+        PORT80_PID=$($SUDO_PREFIX lsof -Pi :80 -sTCP:LISTEN -t 2>/dev/null | head -1 || echo "")
+        if [ -n "$PORT80_PID" ]; then
+            PORT80_PROCESS=$($SUDO_PREFIX ps -p "$PORT80_PID" -o comm= 2>/dev/null || echo "unknown")
+            log_warning "Port 80 đang được sử dụng bởi process: $PORT80_PROCESS (PID: $PORT80_PID)"
+        fi
     fi
     
     log_info "Đang yêu cầu certificate từ Let's Encrypt..."
     log_warning "LƯU Ý: Domain $DOMAIN phải trỏ về IP server này và port 80/443 phải mở"
     
-    # Sử dụng standalone mode (yêu cầu tạm dừng web server)
-    read -p "Bạn có muốn cài đặt SSL certificate ngay bây giờ? (y/n): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        # Tạm dừng Nginx nếu đang chạy
-        if $SUDO_PREFIX systemctl is-active --quiet nginx; then
-            log_info "Tạm dừng Nginx để cấu hình SSL..."
-            $SUDO_PREFIX systemctl stop nginx
+    # Kiểm tra xem có muốn dùng DNS validation không (nếu port 80 bị chiếm)
+    USE_DNS_VALIDATION=false
+    if [ -n "$PORT80_PID" ]; then
+        log_warning "Port 80 đang bị chiếm. Bạn có 2 lựa chọn:"
+        log_info "1. Dùng DNS validation (khuyến nghị) - không cần port 80"
+        log_info "2. Dừng process đang dùng port 80 và dùng HTTP validation"
+        read -p "Bạn muốn dùng DNS validation? (y/n - mặc định: y): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            USE_DNS_VALIDATION=true
         fi
-        
-        # Yêu cầu certificate
-        $SUDO_PREFIX certbot certonly --standalone -d "$DOMAIN" --non-interactive --agree-tos --email "admin@$DOMAIN" || {
-            log_error "Không thể cài đặt certificate. Vui lòng kiểm tra:"
-            log_info "1. Domain $DOMAIN có trỏ về IP server này không?"
-            log_info "2. Port 80 và 443 có mở không?"
-            log_info "3. Firewall có cho phép kết nối không?"
-            
-            # Khởi động lại Nginx nếu đã dừng
-            if ! $SUDO_PREFIX systemctl is-active --quiet nginx; then
-                $SUDO_PREFIX systemctl start nginx
-            fi
-            exit 1
-        }
-        
-        # Khởi động lại Nginx
-        if ! $SUDO_PREFIX systemctl is-active --quiet nginx; then
-            $SUDO_PREFIX systemctl start nginx
+    fi
+    
+    if [ "$USE_DNS_VALIDATION" = true ]; then
+        log_info "Sử dụng DNS validation với Cloudflare..."
+        log_info "Chạy script setup-ssl-cloudflare.sh..."
+        if [ -f "scripts/setup-ssl-cloudflare.sh" ]; then
+            chmod +x scripts/setup-ssl-cloudflare.sh
+            ./scripts/setup-ssl-cloudflare.sh
+        else
+            log_error "Script setup-ssl-cloudflare.sh không tồn tại!"
+            log_info "Bạn có thể cài đặt SSL sau bằng:"
+            log_info "1. Cài đặt python3-certbot-dns-cloudflare: $SUDO_PREFIX apt-get install -y python3-certbot-dns-cloudflare"
+            log_info "2. Chạy: $SUDO_PREFIX certbot certonly --dns-cloudflare --dns-cloudflare-credentials cloudflare.ini -d $DOMAIN"
         fi
-        
-        log_success "Certificate đã được cài đặt thành công!"
     else
-        log_warning "Bỏ qua cài đặt SSL. Bạn có thể cài đặt sau bằng:"
-        log_info "1. HTTP validation: $SUDO_PREFIX certbot certonly --standalone -d $DOMAIN"
-        log_info "2. DNS validation (Cloudflare): ./scripts/setup-ssl-cloudflare.sh"
+        # Sử dụng standalone mode (yêu cầu tạm dừng web server)
+        read -p "Bạn có muốn cài đặt SSL certificate ngay bây giờ? (y/n): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            # Kill tất cả process đang dùng port 80
+            PORT80_PIDS=()
+            if command -v lsof &> /dev/null; then
+                PORT80_PIDS=($($SUDO_PREFIX lsof -ti :80 2>/dev/null || echo ""))
+            elif command -v fuser &> /dev/null; then
+                PORT80_PIDS=($($SUDO_PREFIX fuser 80/tcp 2>/dev/null | awk '{print $1}' || echo ""))
+            fi
+            
+            if [ ${#PORT80_PIDS[@]} -gt 0 ]; then
+                log_warning "Đang kill process đang dùng port 80..."
+                for pid in "${PORT80_PIDS[@]}"; do
+                    if [ -n "$pid" ]; then
+                        PROCESS_NAME=$($SUDO_PREFIX ps -p "$pid" -o comm= 2>/dev/null || echo "unknown")
+                        log_info "Killing process: $PROCESS_NAME (PID: $pid)"
+                        $SUDO_PREFIX kill -9 "$pid" 2>/dev/null || true
+                        sleep 1
+                    fi
+                done
+                log_success "Đã kill tất cả process đang dùng port 80"
+            fi
+            
+            # Tạm dừng Nginx nếu đang chạy (chỉ nếu Nginx đã được cài đặt)
+            NGINX_STOPPED=false
+            if $SUDO_PREFIX systemctl list-unit-files | grep -q "nginx.service" 2>/dev/null; then
+                if $SUDO_PREFIX systemctl is-active --quiet nginx 2>/dev/null; then
+                    log_info "Tạm dừng Nginx để cấu hình SSL..."
+                    $SUDO_PREFIX systemctl stop nginx
+                    NGINX_STOPPED=true
+                fi
+            else
+                log_info "Nginx chưa được cài đặt, bỏ qua"
+            fi
+            
+            # Yêu cầu certificate
+            $SUDO_PREFIX certbot certonly --standalone -d "$DOMAIN" --non-interactive --agree-tos --email "admin@$DOMAIN" || {
+                log_error "Không thể cài đặt certificate. Vui lòng kiểm tra:"
+                log_info "1. Domain $DOMAIN có trỏ về IP server này không?"
+                log_info "2. Port 80 và 443 có mở không?"
+                log_info "3. Firewall có cho phép kết nối không?"
+                log_info "4. Hoặc thử dùng DNS validation: ./scripts/setup-ssl-cloudflare.sh"
+                
+                # Khởi động lại Nginx nếu đã dừng
+                if [ "$NGINX_STOPPED" = true ] && $SUDO_PREFIX systemctl list-unit-files | grep -q "nginx.service" 2>/dev/null; then
+                    $SUDO_PREFIX systemctl start nginx 2>/dev/null || true
+                fi
+                exit 1
+            }
+            
+            # Khởi động lại Nginx nếu đã dừng (chỉ nếu Nginx đã được cài đặt)
+            if [ "$NGINX_STOPPED" = true ] && $SUDO_PREFIX systemctl list-unit-files | grep -q "nginx.service" 2>/dev/null; then
+                log_info "Khởi động lại Nginx..."
+                $SUDO_PREFIX systemctl start nginx 2>/dev/null || log_warning "Không thể khởi động lại Nginx"
+            fi
+            
+            log_success "Certificate đã được cài đặt thành công!"
+        else
+            log_warning "Bỏ qua cài đặt SSL. Bạn có thể cài đặt sau bằng:"
+            log_info "1. HTTP validation: $SUDO_PREFIX certbot certonly --standalone -d $DOMAIN"
+            log_info "2. DNS validation (Cloudflare): ./scripts/setup-ssl-cloudflare.sh"
+        fi
     fi
 else
     log_success "Certificate SSL đã tồn tại cho domain: $DOMAIN"
