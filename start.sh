@@ -27,11 +27,12 @@ echo "║  Tự động cấu hình server, SSL và chạy trên PM2     ║"
 echo "╚══════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
-# Kiểm tra quyền root
+# Kiểm tra quyền root và thiết lập SUDO prefix
 if [[ $EUID -eq 0 ]]; then
-    log_error "Không nên chạy script này với quyền root!"
-    log_info "Hãy chạy với user thường có sudo privileges"
-    exit 1
+    log_warning "Đang chạy với quyền root. Một số lệnh sẽ không cần sudo."
+    SUDO_PREFIX=""
+else
+    SUDO_PREFIX="sudo"
 fi
 
 # ============================================
@@ -57,7 +58,7 @@ log_success "npm $(npm -v) đã có sẵn"
 # Kiểm tra PM2
 if ! command -v pm2 &> /dev/null; then
     log_warning "PM2 chưa được cài đặt, đang cài đặt..."
-    sudo npm install -g pm2
+    $SUDO_PREFIX npm install -g pm2
     log_success "PM2 đã được cài đặt"
 else
     log_success "PM2 $(pm2 -v) đã có sẵn"
@@ -66,8 +67,8 @@ fi
 # Kiểm tra certbot (cho SSL)
 if ! command -v certbot &> /dev/null; then
     log_warning "Certbot chưa được cài đặt, đang cài đặt..."
-    sudo apt-get update -qq
-    sudo apt-get install -y -qq certbot
+    $SUDO_PREFIX apt-get update -qq
+    $SUDO_PREFIX apt-get install -y -qq certbot
     log_success "Certbot đã được cài đặt"
 else
     log_success "Certbot đã có sẵn"
@@ -170,7 +171,7 @@ if [ ! -f "$CERT_PATH" ]; then
     log_info "Đang cấu hình SSL với Let's Encrypt (hoạt động với Cloudflare)..."
     
     # Kiểm tra xem port 80 có đang được sử dụng không
-    if sudo lsof -Pi :80 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    if $SUDO_PREFIX lsof -Pi :80 -sTCP:LISTEN -t >/dev/null 2>&1; then
         log_warning "Port 80 đang được sử dụng. Đảm bảo Nginx hoặc web server khác đã được cấu hình."
         log_info "Bạn có thể cần cấu hình Nginx để proxy đến Let's Encrypt validation"
     fi
@@ -183,34 +184,34 @@ if [ ! -f "$CERT_PATH" ]; then
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         # Tạm dừng Nginx nếu đang chạy
-        if sudo systemctl is-active --quiet nginx; then
+        if $SUDO_PREFIX systemctl is-active --quiet nginx; then
             log_info "Tạm dừng Nginx để cấu hình SSL..."
-            sudo systemctl stop nginx
+            $SUDO_PREFIX systemctl stop nginx
         fi
         
         # Yêu cầu certificate
-        sudo certbot certonly --standalone -d "$DOMAIN" --non-interactive --agree-tos --email "admin@$DOMAIN" || {
+        $SUDO_PREFIX certbot certonly --standalone -d "$DOMAIN" --non-interactive --agree-tos --email "admin@$DOMAIN" || {
             log_error "Không thể cài đặt certificate. Vui lòng kiểm tra:"
             log_info "1. Domain $DOMAIN có trỏ về IP server này không?"
             log_info "2. Port 80 và 443 có mở không?"
             log_info "3. Firewall có cho phép kết nối không?"
             
             # Khởi động lại Nginx nếu đã dừng
-            if ! sudo systemctl is-active --quiet nginx; then
-                sudo systemctl start nginx
+            if ! $SUDO_PREFIX systemctl is-active --quiet nginx; then
+                $SUDO_PREFIX systemctl start nginx
             fi
             exit 1
         }
         
         # Khởi động lại Nginx
-        if ! sudo systemctl is-active --quiet nginx; then
-            sudo systemctl start nginx
+        if ! $SUDO_PREFIX systemctl is-active --quiet nginx; then
+            $SUDO_PREFIX systemctl start nginx
         fi
         
         log_success "Certificate đã được cài đặt thành công!"
     else
         log_warning "Bỏ qua cài đặt SSL. Bạn có thể cài đặt sau bằng:"
-        log_info "1. HTTP validation: sudo certbot certonly --standalone -d $DOMAIN"
+        log_info "1. HTTP validation: $SUDO_PREFIX certbot certonly --standalone -d $DOMAIN"
         log_info "2. DNS validation (Cloudflare): ./scripts/setup-ssl-cloudflare.sh"
     fi
 else
@@ -299,12 +300,12 @@ log_success "Thư mục logs đã sẵn sàng"
 log_step "Bước 6: Kiểm tra MongoDB..."
 
 if command -v mongod &> /dev/null; then
-    if sudo systemctl is-active --quiet mongod; then
+    if $SUDO_PREFIX systemctl is-active --quiet mongod; then
         log_success "MongoDB đang chạy"
     else
         log_warning "MongoDB chưa chạy, đang khởi động..."
-        sudo systemctl start mongod
-        sudo systemctl enable mongod
+        $SUDO_PREFIX systemctl start mongod
+        $SUDO_PREFIX systemctl enable mongod
         log_success "MongoDB đã được khởi động"
     fi
 else
@@ -346,7 +347,11 @@ pm2 save
 # Cấu hình PM2 startup script
 if ! pm2 startup | grep -q "already"; then
     log_info "Đang cấu hình PM2 startup..."
-    sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u $USER --hp $HOME
+    if [[ $EUID -eq 0 ]]; then
+        env PATH=$PATH:/usr/bin pm2 startup systemd -u root --hp /root
+    else
+        $SUDO_PREFIX env PATH=$PATH:/usr/bin pm2 startup systemd -u $USER --hp $HOME
+    fi
     pm2 save
 fi
 
@@ -378,7 +383,7 @@ echo -e "\n${YELLOW}🔒 SSL Certificate:${NC}"
 if [ -f "$CERT_PATH" ]; then
     echo "Certificate: $CERT_PATH"
     echo "Private Key: $KEY_PATH"
-    echo "Renew certificate: sudo certbot renew"
+    echo "Renew certificate: $SUDO_PREFIX certbot renew"
 else
     echo "Certificate chưa được cài đặt"
 fi
