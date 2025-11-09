@@ -87,6 +87,14 @@ INCR_MAX_PER_MINUTE=60
 # Server Configuration
 PORT=3000
 NODE_ENV=development
+BASE_URL=http://localhost:3000
+API_BASE_URL=http://localhost:3000
+
+# SSL Configuration (tự động cấu hình bởi start.sh)
+USE_HTTPS=false
+SSL_KEY_PATH=
+SSL_CERT_PATH=
+SSL_FULLCHAIN_PATH=
 ```
 
 ## 🔐 Authentication
@@ -157,16 +165,51 @@ The application uses Winston for logging:
 
 ## 🚀 Deployment
 
-1. Set production environment variables
-2. Build and start the application:
+### Quick Setup với Auto-Configuration Script
+
+Sau khi pull code từ server, chạy script tự động để cấu hình toàn bộ:
+
+```bash
+# Cấp quyền thực thi (chỉ cần làm 1 lần)
+chmod +x start.sh
+
+# Chạy script setup và start
+./start.sh
+```
+
+Script này sẽ tự động:
+- ✅ Kiểm tra và cài đặt dependencies (Node.js, npm, PM2, certbot)
+- ✅ Tạo file `.env` nếu chưa có
+- ✅ Cài đặt npm packages
+- ✅ Cấu hình SSL với Let's Encrypt (hoạt động với Cloudflare) dựa trên `API_BASE_URL` trong `.env`
+- ✅ Cấu hình PM2 để chạy server
+- ✅ Khởi động server với PM2
+- ✅ Cấu hình PM2 startup để tự động khởi động khi server reboot
+
+### Manual Deployment
+
+1. Set production environment variables trong file `.env`
+2. Đảm bảo `API_BASE_URL` trong `.env` trỏ đúng domain của bạn
+3. Build and start the application:
    ```bash
    npm start
    ```
-3. Use PM2 for process management:
+4. Use PM2 for process management:
    ```bash
    npm install -g pm2
-   pm2 start server.js --name "posed-server"
+   pm2 start ecosystem.config.js
+   pm2 save
+   pm2 startup
    ```
+
+### SSL Configuration với Cloudflare
+
+Script `start.sh` tự động cấu hình SSL với Let's Encrypt. Đảm bảo:
+- Domain trong `API_BASE_URL` đã trỏ về IP server
+- Port 80 và 443 đã mở trên firewall
+- Nginx (nếu có) đã được cấu hình đúng
+
+Sau khi cài đặt, certificate sẽ được tự động renew bởi certbot.
 
 ## 📚 Documentation
 

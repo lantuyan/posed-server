@@ -1,0 +1,387 @@
+#!/bin/bash
+
+# 🚀 Pose Server - Auto Setup & Start Script
+# Script tự động cấu hình server, SSL với Cloudflare và chạy trên PM2
+# Sử dụng: ./start.sh
+
+set -e
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+log_step() { echo -e "${CYAN}[STEP]${NC} $1"; }
+
+echo -e "${GREEN}"
+echo "╔══════════════════════════════════════════════════════╗"
+echo "║     Pose Server - Auto Setup & Start Script         ║"
+echo "║  Tự động cấu hình server, SSL và chạy trên PM2     ║"
+echo "╚══════════════════════════════════════════════════════╝"
+echo -e "${NC}"
+
+# Kiểm tra quyền root
+if [[ $EUID -eq 0 ]]; then
+    log_error "Không nên chạy script này với quyền root!"
+    log_info "Hãy chạy với user thường có sudo privileges"
+    exit 1
+fi
+
+# ============================================
+# BƯỚC 1: Kiểm tra và cài đặt dependencies
+# ============================================
+log_step "Bước 1: Kiểm tra dependencies..."
+
+# Kiểm tra Node.js
+if ! command -v node &> /dev/null; then
+    log_error "Node.js chưa được cài đặt!"
+    log_info "Vui lòng chạy setup-server.sh trước hoặc cài đặt Node.js"
+    exit 1
+fi
+log_success "Node.js $(node -v) đã có sẵn"
+
+# Kiểm tra npm
+if ! command -v npm &> /dev/null; then
+    log_error "npm chưa được cài đặt!"
+    exit 1
+fi
+log_success "npm $(npm -v) đã có sẵn"
+
+# Kiểm tra PM2
+if ! command -v pm2 &> /dev/null; then
+    log_warning "PM2 chưa được cài đặt, đang cài đặt..."
+    sudo npm install -g pm2
+    log_success "PM2 đã được cài đặt"
+else
+    log_success "PM2 $(pm2 -v) đã có sẵn"
+fi
+
+# Kiểm tra certbot (cho SSL)
+if ! command -v certbot &> /dev/null; then
+    log_warning "Certbot chưa được cài đặt, đang cài đặt..."
+    sudo apt-get update -qq
+    sudo apt-get install -y -qq certbot
+    log_success "Certbot đã được cài đặt"
+else
+    log_success "Certbot đã có sẵn"
+fi
+
+# ============================================
+# BƯỚC 2: Kiểm tra và tạo file .env
+# ============================================
+log_step "Bước 2: Kiểm tra file .env..."
+
+if [ ! -f .env ]; then
+    log_warning "File .env không tồn tại, đang tạo file mẫu..."
+    cat > .env << 'EOF'
+# Database
+MONGODB_URI=mongodb://localhost:27017/posed-server
+
+# JWT Configuration
+JWT_SECRET=your-secret-key-change-this-in-production
+JWT_EXPIRES_IN=1h
+
+# Static User Token for Public API
+STATIC_USER_TOKEN=your-static-token-change-this
+
+# Server Configuration
+PORT=3000
+NODE_ENV=production
+BASE_URL=https://yourdomain.com
+API_BASE_URL=https://yourdomain.com
+
+# Upload Configuration
+UPLOAD_PATH=uploads/images
+MAX_IMAGE_SIZE=10485760
+
+# Rate Limiting
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=1000
+
+# SSL Configuration (sẽ được cấu hình tự động)
+USE_HTTPS=false
+SSL_KEY_PATH=
+SSL_CERT_PATH=
+SSL_FULLCHAIN_PATH=
+EOF
+    log_warning "Đã tạo file .env mẫu. VUI LÒNG CẬP NHẬT CÁC GIÁ TRỊ CẦN THIẾT!"
+    log_info "Đặc biệt quan trọng: Cập nhật API_BASE_URL với domain của bạn"
+    read -p "Nhấn Enter để tiếp tục sau khi đã cập nhật .env..."
+else
+    log_success "File .env đã tồn tại"
+fi
+
+# Load .env để lấy API_BASE_URL (sử dụng grep để tránh lỗi với source)
+API_BASE_URL=$(grep -E "^API_BASE_URL=" .env 2>/dev/null | cut -d '=' -f2- | tr -d '"' | tr -d "'" | xargs || echo "")
+
+# Nếu không có API_BASE_URL, thử dùng BASE_URL
+if [ -z "$API_BASE_URL" ] || [ "$API_BASE_URL" = "https://yourdomain.com" ] || [ "$API_BASE_URL" = "http://localhost:3000" ]; then
+    API_BASE_URL=$(grep -E "^BASE_URL=" .env 2>/dev/null | cut -d '=' -f2- | tr -d '"' | tr -d "'" | xargs || echo "")
+fi
+
+# Kiểm tra API_BASE_URL
+if [ -z "$API_BASE_URL" ] || [ "$API_BASE_URL" = "https://yourdomain.com" ] || [ "$API_BASE_URL" = "http://localhost:3000" ]; then
+    log_error "API_BASE_URL hoặc BASE_URL chưa được cấu hình trong .env!"
+    log_info "Vui lòng cập nhật API_BASE_URL trong file .env với domain của bạn"
+    log_info "Ví dụ: API_BASE_URL=https://pose.sixpilot.technology"
+    exit 1
+fi
+
+log_success "API_BASE_URL: $API_BASE_URL"
+
+# Extract domain từ API_BASE_URL
+DOMAIN=$(echo "$API_BASE_URL" | sed -e 's|^[^/]*//||' -e 's|/.*$||' -e 's|:.*$||')
+log_info "Domain được phát hiện: $DOMAIN"
+
+# ============================================
+# BƯỚC 3: Cài đặt npm packages
+# ============================================
+log_step "Bước 3: Cài đặt npm packages..."
+
+if [ ! -d "node_modules" ]; then
+    log_info "Đang cài đặt dependencies..."
+    npm install
+    log_success "Dependencies đã được cài đặt"
+else
+    log_info "Đang cập nhật dependencies..."
+    npm install
+    log_success "Dependencies đã được cập nhật"
+fi
+
+# ============================================
+# BƯỚC 4: Cấu hình SSL với Cloudflare
+# ============================================
+log_step "Bước 4: Cấu hình SSL với Cloudflare..."
+
+# Kiểm tra xem đã có certificate chưa
+CERT_PATH="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+KEY_PATH="/etc/letsencrypt/live/$DOMAIN/privkey.pem"
+
+if [ ! -f "$CERT_PATH" ]; then
+    log_warning "Certificate SSL chưa được cấu hình cho domain: $DOMAIN"
+    log_info "Đang cấu hình SSL với Let's Encrypt (hoạt động với Cloudflare)..."
+    
+    # Kiểm tra xem port 80 có đang được sử dụng không
+    if sudo lsof -Pi :80 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        log_warning "Port 80 đang được sử dụng. Đảm bảo Nginx hoặc web server khác đã được cấu hình."
+        log_info "Bạn có thể cần cấu hình Nginx để proxy đến Let's Encrypt validation"
+    fi
+    
+    log_info "Đang yêu cầu certificate từ Let's Encrypt..."
+    log_warning "LƯU Ý: Domain $DOMAIN phải trỏ về IP server này và port 80/443 phải mở"
+    
+    # Sử dụng standalone mode (yêu cầu tạm dừng web server)
+    read -p "Bạn có muốn cài đặt SSL certificate ngay bây giờ? (y/n): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        # Tạm dừng Nginx nếu đang chạy
+        if sudo systemctl is-active --quiet nginx; then
+            log_info "Tạm dừng Nginx để cấu hình SSL..."
+            sudo systemctl stop nginx
+        fi
+        
+        # Yêu cầu certificate
+        sudo certbot certonly --standalone -d "$DOMAIN" --non-interactive --agree-tos --email "admin@$DOMAIN" || {
+            log_error "Không thể cài đặt certificate. Vui lòng kiểm tra:"
+            log_info "1. Domain $DOMAIN có trỏ về IP server này không?"
+            log_info "2. Port 80 và 443 có mở không?"
+            log_info "3. Firewall có cho phép kết nối không?"
+            
+            # Khởi động lại Nginx nếu đã dừng
+            if ! sudo systemctl is-active --quiet nginx; then
+                sudo systemctl start nginx
+            fi
+            exit 1
+        }
+        
+        # Khởi động lại Nginx
+        if ! sudo systemctl is-active --quiet nginx; then
+            sudo systemctl start nginx
+        fi
+        
+        log_success "Certificate đã được cài đặt thành công!"
+    else
+        log_warning "Bỏ qua cài đặt SSL. Bạn có thể cài đặt sau bằng:"
+        log_info "1. HTTP validation: sudo certbot certonly --standalone -d $DOMAIN"
+        log_info "2. DNS validation (Cloudflare): ./scripts/setup-ssl-cloudflare.sh"
+    fi
+else
+    log_success "Certificate SSL đã tồn tại cho domain: $DOMAIN"
+fi
+
+# Cập nhật .env với đường dẫn certificate
+if [ -f "$CERT_PATH" ] && [ -f "$KEY_PATH" ]; then
+    log_info "Cập nhật .env với đường dẫn certificate..."
+    
+    # Backup .env
+    cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
+    
+    # Cập nhật SSL paths trong .env
+    if grep -q "USE_HTTPS=" .env; then
+        sed -i "s|USE_HTTPS=.*|USE_HTTPS=true|" .env
+    else
+        echo "USE_HTTPS=true" >> .env
+    fi
+    
+    if grep -q "SSL_KEY_PATH=" .env; then
+        sed -i "s|SSL_KEY_PATH=.*|SSL_KEY_PATH=$KEY_PATH|" .env
+    else
+        echo "SSL_KEY_PATH=$KEY_PATH" >> .env
+    fi
+    
+    if grep -q "SSL_CERT_PATH=" .env; then
+        sed -i "s|SSL_CERT_PATH=.*|SSL_CERT_PATH=$CERT_PATH|" .env
+    else
+        echo "SSL_CERT_PATH=$CERT_PATH" >> .env
+    fi
+    
+    if grep -q "SSL_FULLCHAIN_PATH=" .env; then
+        sed -i "s|SSL_FULLCHAIN_PATH=.*|SSL_FULLCHAIN_PATH=$CERT_PATH|" .env
+    else
+        echo "SSL_FULLCHAIN_PATH=$CERT_PATH" >> .env
+    fi
+    
+    log_success "Đã cập nhật .env với cấu hình SSL"
+fi
+
+# ============================================
+# BƯỚC 5: Cấu hình PM2
+# ============================================
+log_step "Bước 5: Cấu hình PM2..."
+
+# Kiểm tra xem đã có ecosystem config chưa
+if [ ! -f "ecosystem.config.js" ]; then
+    log_info "Đang tạo file cấu hình PM2..."
+    cat > ecosystem.config.js << EOF
+module.exports = {
+  apps: [{
+    name: 'posed-server',
+    script: './server.js',
+    instances: 1,
+    exec_mode: 'fork',
+    watch: false,
+    max_memory_restart: '1G',
+    env: {
+      NODE_ENV: 'production',
+      PORT: 3000
+    },
+    error_file: './logs/pm2-error.log',
+    out_file: './logs/pm2-out.log',
+    log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+    merge_logs: true,
+    autorestart: true,
+    max_restarts: 10,
+    min_uptime: '10s',
+    restart_delay: 4000
+  }]
+};
+EOF
+    log_success "Đã tạo file ecosystem.config.js"
+else
+    log_success "File ecosystem.config.js đã tồn tại"
+fi
+
+# Tạo thư mục logs nếu chưa có
+mkdir -p logs
+log_success "Thư mục logs đã sẵn sàng"
+
+# ============================================
+# BƯỚC 6: Kiểm tra MongoDB
+# ============================================
+log_step "Bước 6: Kiểm tra MongoDB..."
+
+if command -v mongod &> /dev/null; then
+    if sudo systemctl is-active --quiet mongod; then
+        log_success "MongoDB đang chạy"
+    else
+        log_warning "MongoDB chưa chạy, đang khởi động..."
+        sudo systemctl start mongod
+        sudo systemctl enable mongod
+        log_success "MongoDB đã được khởi động"
+    fi
+else
+    log_warning "MongoDB chưa được cài đặt"
+    log_info "Vui lòng cài đặt MongoDB hoặc cập nhật MONGODB_URI trong .env"
+fi
+
+# ============================================
+# BƯỚC 7: Setup admin user (nếu cần)
+# ============================================
+log_step "Bước 7: Kiểm tra admin user..."
+
+read -p "Bạn có muốn tạo admin user mới? (y/n): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    log_info "Đang chạy script setup admin..."
+    npm run setup:admin
+fi
+
+# ============================================
+# BƯỚC 8: Khởi động server với PM2
+# ============================================
+log_step "Bước 8: Khởi động server với PM2..."
+
+# Dừng instance cũ nếu có
+if pm2 list | grep -q "posed-server"; then
+    log_info "Đang dừng instance cũ..."
+    pm2 delete posed-server || true
+    sleep 2
+fi
+
+# Khởi động với PM2
+log_info "Đang khởi động server với PM2..."
+pm2 start ecosystem.config.js
+
+# Lưu PM2 process list
+pm2 save
+
+# Cấu hình PM2 startup script
+if ! pm2 startup | grep -q "already"; then
+    log_info "Đang cấu hình PM2 startup..."
+    sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u $USER --hp $HOME
+    pm2 save
+fi
+
+log_success "Server đã được khởi động với PM2!"
+
+# ============================================
+# BƯỚC 9: Hiển thị thông tin
+# ============================================
+echo -e "\n${GREEN}╔══════════════════════════════════════════════════════╗"
+echo -e "║              SETUP HOÀN TẤT!                      ║"
+echo -e "╚══════════════════════════════════════════════════════╝${NC}\n"
+
+log_info "📊 Trạng thái PM2:"
+pm2 status
+
+echo -e "\n${YELLOW}📝 Thông tin server:${NC}"
+echo "Domain: $DOMAIN"
+echo "API Base URL: $API_BASE_URL"
+echo "Port: ${PORT:-3000}"
+
+echo -e "\n${YELLOW}🔧 Các lệnh hữu ích:${NC}"
+echo "Xem logs:           pm2 logs posed-server"
+echo "Xem status:         pm2 status"
+echo "Restart server:      pm2 restart posed-server"
+echo "Stop server:        pm2 stop posed-server"
+echo "Xem monitoring:     pm2 monit"
+
+echo -e "\n${YELLOW}🔒 SSL Certificate:${NC}"
+if [ -f "$CERT_PATH" ]; then
+    echo "Certificate: $CERT_PATH"
+    echo "Private Key: $KEY_PATH"
+    echo "Renew certificate: sudo certbot renew"
+else
+    echo "Certificate chưa được cài đặt"
+fi
+
+echo -e "\n${GREEN}🎉 Server đã sẵn sàng và đang chạy!${NC}\n"
+
