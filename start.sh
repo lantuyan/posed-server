@@ -322,10 +322,15 @@ if [ -f "$CERT_PATH" ] && [ -f "$KEY_PATH" ]; then
     cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
     
     # Cập nhật SSL paths trong .env
+    # LƯU Ý QUAN TRỌNG: 
+    # - Khi dùng Nginx reverse proxy (production), Node.js server nên chạy HTTP (USE_HTTPS=false)
+    # - Nginx sẽ xử lý SSL termination và proxy HTTP requests đến localhost:3000
+    # - SSL certificates vẫn được lưu trong .env để Nginx sử dụng
+    # - Chỉ set USE_HTTPS=true nếu KHÔNG dùng Nginx (development hoặc direct access)
     if grep -q "USE_HTTPS=" .env; then
-        sed -i "s|USE_HTTPS=.*|USE_HTTPS=true|" .env
+        sed -i "s|USE_HTTPS=.*|USE_HTTPS=false|" .env
     else
-        echo "USE_HTTPS=true" >> .env
+        echo "USE_HTTPS=false" >> .env
     fi
     
     if grep -q "SSL_KEY_PATH=" .env; then
@@ -347,6 +352,7 @@ if [ -f "$CERT_PATH" ] && [ -f "$KEY_PATH" ]; then
     fi
     
     log_success "Đã cập nhật .env với cấu hình SSL"
+    log_info "USE_HTTPS=false (Nginx sẽ xử lý SSL termination)"
     
     # Extract SSL pin hash (để copy vào client app)
     # LƯU Ý: Nếu client app sẽ hardcode certificate/pin hash, không cần lưu vào .env
@@ -883,6 +889,28 @@ if [ -f .env ]; then
             fi
         fi
     done
+    
+    # Kiểm tra USE_HTTPS - QUAN TRỌNG cho Nginx reverse proxy
+    # Nếu có Nginx config, Node.js server phải chạy HTTP (USE_HTTPS=false)
+    NGINX_CONFIG="/etc/nginx/sites-available/posed-server"
+    if [ -f "$NGINX_CONFIG" ]; then
+        USE_HTTPS=$(grep -E "^USE_HTTPS=" .env 2>/dev/null | cut -d '=' -f2 | tr -d '"' | tr -d "'" | xargs || echo "false")
+        if [ "$USE_HTTPS" = "true" ]; then
+            log_warning "USE_HTTPS=true nhưng đang dùng Nginx reverse proxy!"
+            log_info "Đang sửa USE_HTTPS=false (Nginx sẽ xử lý SSL termination)"
+            # Backup .env
+            cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
+            # Sửa giá trị
+            if grep -q "USE_HTTPS=" .env; then
+                sed -i "s|USE_HTTPS=.*|USE_HTTPS=false|" .env
+            else
+                echo "USE_HTTPS=false" >> .env
+            fi
+            log_success "Đã sửa USE_HTTPS=false"
+        else
+            log_success "USE_HTTPS=false - Đúng cấu hình cho Nginx reverse proxy"
+        fi
+    fi
 fi
 
 # Khởi động với PM2
@@ -905,6 +933,26 @@ fi
 
 log_success "Server đã được khởi động với PM2!"
 
+# Đợi server khởi động
+log_info "Đang đợi server khởi động (5 giây)..."
+sleep 5
+
+# Kiểm tra kết nối localhost:3000
+log_info "Đang kiểm tra kết nối đến localhost:3000..."
+if command -v curl &> /dev/null; then
+    HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:3000/health 2>/dev/null || echo "000")
+    if [ "$HTTP_RESPONSE" = "200" ]; then
+        log_success "✅ Server đang chạy và phản hồi đúng! (HTTP 200)"
+    elif [ "$HTTP_RESPONSE" = "000" ]; then
+        log_warning "⚠️  Không thể kết nối đến localhost:3000"
+        log_info "Kiểm tra logs: pm2 logs posed-server"
+    else
+        log_warning "⚠️  Server phản hồi với HTTP code: $HTTP_RESPONSE"
+    fi
+else
+    log_warning "curl chưa được cài đặt, không thể test kết nối"
+fi
+
 # ============================================
 # BƯỚC 11: Hiển thị thông tin
 # ============================================
@@ -919,6 +967,10 @@ echo -e "\n${YELLOW}📝 Thông tin server:${NC}"
 echo "Domain: $DOMAIN"
 echo "API Base URL: $API_BASE_URL"
 echo "Port: ${PORT:-3000}"
+if [ -f .env ]; then
+    USE_HTTPS=$(grep -E "^USE_HTTPS=" .env 2>/dev/null | cut -d '=' -f2 | tr -d '"' | tr -d "'" | xargs || echo "false")
+    echo "USE_HTTPS: $USE_HTTPS (Node.js server chạy HTTP, Nginx xử lý SSL)"
+fi
 
 echo -e "\n${YELLOW}🔧 Các lệnh hữu ích:${NC}"
 echo "Xem logs:           pm2 logs posed-server"
