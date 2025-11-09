@@ -28,6 +28,94 @@ app.use((req, res, next) => {
   helmet()(req, res, next);
 });
 
+// SSL Pinning Information Endpoint (OPTIONAL)
+// LƯU Ý QUAN TRỌNG: 
+// - HPKP (Public-Key-Pins) headers đã bị DEPRECATED và không còn được hỗ trợ
+// - SSL Pinning để chống Proxyman/MITM cần được implement ở CLIENT-SIDE (mobile app)
+// - Client app nên HARDCODE pin hash trong app, không nên fetch từ server
+// - Endpoint này chỉ để reference/documentation, không nên dùng trong production
+
+// Endpoint để lấy pin hash (optional - chỉ để reference)
+// LƯU Ý: Nếu client app hardcode pin hash, endpoint này không cần thiết
+app.get('/api/ssl-pin-info', (req, res) => {
+  const sslPinHash = process.env.SSL_PIN_HASH;
+  const useHttps = process.env.USE_HTTPS === 'true';
+  
+  if (useHttps && sslPinHash) {
+    res.json({
+      success: true,
+      pinHash: sslPinHash,
+      algorithm: 'sha256',
+      format: 'base64',
+      note: '⚠️ LƯU Ý: Nên hardcode pin hash trong client app, không nên fetch từ server',
+      recommendation: 'Copy pin hash từ certs/pin-hash.txt và hardcode trong mobile app'
+    });
+  } else {
+    // Nếu không có trong .env, thử đọc từ file
+    const fs = require('fs');
+    const path = require('path');
+    const pinHashFile = path.join(process.cwd(), 'certs', 'pin-hash.txt');
+    
+    if (fs.existsSync(pinHashFile)) {
+      const pinHash = fs.readFileSync(pinHashFile, 'utf8').trim();
+      res.json({
+        success: true,
+        pinHash: pinHash,
+        algorithm: 'sha256',
+        format: 'base64',
+        source: 'certs/pin-hash.txt',
+        note: '⚠️ LƯU Ý: Nên hardcode pin hash trong client app, không nên fetch từ server',
+        recommendation: 'Copy pin hash trên và hardcode trong mobile app'
+      });
+    } else {
+      res.status(503).json({
+        success: false,
+        error: 'SSL pinning not configured',
+        note: 'Chạy: npm run extract-pin [certificate-path] để extract pin hash',
+        recommendation: 'Pin hash sẽ được lưu vào certs/pin-hash.txt để copy vào client app'
+      });
+    }
+  }
+});
+
+// Anti-MITM Detection Middleware
+// Phát hiện các dấu hiệu của MITM proxy (như Proxyman)
+app.use((req, res, next) => {
+  // Kiểm tra các headers đặc trưng của MITM proxy
+  const suspiciousHeaders = [
+    'x-forwarded-for',
+    'via',
+    'x-proxy-id',
+    'x-proxy-connection'
+  ];
+  
+  const hasSuspiciousHeaders = suspiciousHeaders.some(header => 
+    req.get(header) && !req.get('X-Forwarded-Proto') // Nếu có X-Forwarded-Proto thì có thể là reverse proxy hợp lệ
+  );
+  
+  // Kiểm tra User-Agent đáng ngờ
+  const userAgent = req.get('User-Agent') || '';
+  const suspiciousUserAgents = ['Proxyman', 'Charles', 'mitmproxy', 'Burp'];
+  const hasSuspiciousUA = suspiciousUserAgents.some(ua => 
+    userAgent.toLowerCase().includes(ua.toLowerCase())
+  );
+  
+  // Log warning nếu phát hiện dấu hiệu MITM
+  if (hasSuspiciousHeaders || hasSuspiciousUA) {
+    logger.warn('Potential MITM proxy detected', {
+      ip: req.ip,
+      userAgent: userAgent,
+      headers: suspiciousHeaders.filter(h => req.get(h)),
+      path: req.path
+    });
+    
+    // Có thể từ chối request hoặc chỉ log (tùy chọn)
+    // return res.status(403).json({ success: false, error: 'Request blocked' });
+  }
+  
+  next();
+});
+
 // CORS configuration
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3001',

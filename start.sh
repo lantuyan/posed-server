@@ -112,6 +112,9 @@ USE_HTTPS=false
 SSL_KEY_PATH=
 SSL_CERT_PATH=
 SSL_FULLCHAIN_PATH=
+# SSL_PIN_HASH - Optional: Chỉ cần nếu muốn dùng endpoint /api/ssl-pin-info
+# Nếu client app hardcode pin hash, không cần thiết lưu ở đây
+SSL_PIN_HASH=
 EOF
     log_warning "Đã tạo file .env mẫu. VUI LÒNG CẬP NHẬT CÁC GIÁ TRỊ CẦN THIẾT!"
     log_info "Đặc biệt quan trọng: Cập nhật API_BASE_URL với domain của bạn"
@@ -251,6 +254,85 @@ if [ -f "$CERT_PATH" ] && [ -f "$KEY_PATH" ]; then
     fi
     
     log_success "Đã cập nhật .env với cấu hình SSL"
+    
+    # Extract SSL pin hash (để copy vào client app)
+    # LƯU Ý: Nếu client app sẽ hardcode certificate/pin hash, không cần lưu vào .env
+    # Pin hash được lưu vào certs/pin-hash.txt để developer copy vào client app
+    log_info "Đang extract SSL pin hash từ certificate..."
+    log_info "Pin hash sẽ được lưu vào certs/pin-hash.txt để copy vào client app"
+    
+    # Tạo thư mục certs nếu chưa có
+    mkdir -p certs
+    
+    # Chạy extract-pin script và lưu output
+    if node scripts/extract-pin.js "$CERT_PATH" > /tmp/ssl-pin-output.txt 2>&1; then
+        # Đọc pin hash từ file pin-hash.txt (script extract-pin.js tự động lưu vào đó)
+        PIN_HASH_FILE="certs/pin-hash.txt"
+        if [ -f "$PIN_HASH_FILE" ]; then
+            PIN_HASH=$(cat "$PIN_HASH_FILE" | tr -d '\n' | xargs)
+            
+            if [ -n "$PIN_HASH" ]; then
+                log_success "Đã extract SSL pin hash thành công"
+                log_info "Pin hash đã được lưu vào: $PIN_HASH_FILE"
+                log_info "SSL Pin Hash: $PIN_HASH"
+                log_info ""
+                log_info "📋 Bước tiếp theo:"
+                log_info "   1. Copy pin hash trên vào client app (iOS/Android)"
+                log_info "   2. Hardcode pin hash trong client app để implement SSL pinning"
+                log_info "   3. Xem hướng dẫn: cat ssl-pinning-guide.md"
+                log_info ""
+                
+                # Optional: Lưu vào .env nếu cần (cho endpoint /api/ssl-pin-info)
+                # Nếu client app hardcode pin hash, không cần lưu vào .env
+                read -p "Bạn có muốn lưu pin hash vào .env? (y/n - mặc định: n): " -n 1 -r
+                echo
+                if [[ $REPLY =~ ^[Yy]$ ]]; then
+                    if grep -q "SSL_PIN_HASH=" .env; then
+                        sed -i.bak "s|SSL_PIN_HASH=.*|SSL_PIN_HASH=$PIN_HASH|" .env
+                        rm -f .env.bak
+                    else
+                        echo "SSL_PIN_HASH=$PIN_HASH" >> .env
+                    fi
+                    log_success "Đã lưu SSL pin hash vào .env (cho endpoint /api/ssl-pin-info)"
+                else
+                    log_info "Bỏ qua lưu vào .env (client app sẽ hardcode pin hash)"
+                fi
+            else
+                log_warning "Pin hash file tồn tại nhưng rỗng"
+            fi
+        else
+            # Fallback: thử extract từ output text
+            PIN_HASH=$(grep -E 'pin-sha256="[^"]+"' /tmp/ssl-pin-output.txt | head -1 | sed -E 's/.*pin-sha256="([^"]+)".*/\1/' || echo "")
+            if [ -n "$PIN_HASH" ]; then
+                log_success "Đã extract SSL pin hash từ output"
+                log_info "SSL Pin Hash: $PIN_HASH"
+                
+                # Lưu vào file
+                echo "$PIN_HASH" > "$PIN_HASH_FILE"
+                log_success "Đã lưu pin hash vào: $PIN_HASH_FILE"
+                
+                # Optional: Lưu vào .env
+                read -p "Bạn có muốn lưu pin hash vào .env? (y/n - mặc định: n): " -n 1 -r
+                echo
+                if [[ $REPLY =~ ^[Yy]$ ]]; then
+                    if grep -q "SSL_PIN_HASH=" .env; then
+                        sed -i.bak "s|SSL_PIN_HASH=.*|SSL_PIN_HASH=$PIN_HASH|" .env
+                        rm -f .env.bak
+                    else
+                        echo "SSL_PIN_HASH=$PIN_HASH" >> .env
+                    fi
+                    log_success "Đã lưu SSL pin hash vào .env"
+                else
+                    log_info "Bỏ qua lưu vào .env (client app sẽ hardcode pin hash)"
+                fi
+            else
+                log_warning "Không thể extract pin hash. Bạn có thể chạy sau: npm run extract-pin $CERT_PATH"
+            fi
+        fi
+        rm -f /tmp/ssl-pin-output.txt
+    else
+        log_warning "Không thể extract SSL pin hash. Bạn có thể chạy sau: npm run extract-pin $CERT_PATH"
+    fi
 fi
 
 # ============================================

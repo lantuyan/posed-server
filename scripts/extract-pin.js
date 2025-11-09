@@ -18,7 +18,19 @@ try {
 
   // Đọc certificate
   console.log(`📄 Đang đọc certificate từ: ${certPath}\n`);
-  const cert = fs.readFileSync(certPath, 'utf8');
+  const certContent = fs.readFileSync(certPath, 'utf8');
+  
+  // Nếu là fullchain.pem, chỉ lấy certificate đầu tiên (leaf certificate)
+  // Fullchain thường có format: -----BEGIN CERTIFICATE----- ... -----END CERTIFICATE-----\n-----BEGIN CERTIFICATE----- ... -----END CERTIFICATE-----
+  let cert = certContent;
+  const certMatches = certContent.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/);
+  if (certMatches && certMatches.length > 0) {
+    // Lấy certificate đầu tiên (leaf certificate) để pin
+    cert = certMatches[0];
+    if (certMatches.length > 1) {
+      console.log(`ℹ️  Phát hiện ${certMatches.length} certificates trong file. Sử dụng leaf certificate (đầu tiên) để pin.\n`);
+    }
+  }
   
   // Parse certificate
   const certObj = crypto.createPublicKey(cert);
