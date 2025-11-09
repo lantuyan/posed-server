@@ -791,15 +791,98 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 # ============================================
-# BƯỚC 10: Khởi động server với PM2
+# BƯỚC 10: Dọn dẹp và khởi động server với PM2
 # ============================================
-log_step "Bước 10: Khởi động server với PM2..."
+log_step "Bước 10: Dọn dẹp và khởi động server với PM2..."
 
-# Dừng instance cũ nếu có
-if pm2 list | grep -q "posed-server"; then
-    log_info "Đang dừng instance cũ..."
-    pm2 delete posed-server || true
-    sleep 2
+# Dừng tất cả PM2 processes cũ (trừ posed-server sẽ được xử lý riêng)
+log_info "Đang dừng tất cả PM2 processes cũ..."
+pm2 delete all 2>/dev/null || true
+sleep 2
+
+# Kill process đang dùng port 3000 (nếu có)
+log_info "Đang kiểm tra và giải phóng port 3000..."
+PORT_3000_PID=""
+if command -v lsof &> /dev/null; then
+    PORT_3000_PID=$($SUDO_PREFIX lsof -ti :3000 2>/dev/null || echo "")
+elif command -v fuser &> /dev/null; then
+    PORT_3000_PID=$($SUDO_PREFIX fuser 3000/tcp 2>/dev/null | awk '{print $1}' || echo "")
+elif command -v netstat &> /dev/null; then
+    PORT_3000_PID=$($SUDO_PREFIX netstat -tlnp 2>/dev/null | grep ':3000' | awk '{print $7}' | cut -d'/' -f1 | head -1 || echo "")
+fi
+
+if [ -n "$PORT_3000_PID" ]; then
+    # Loại bỏ các ký tự không phải số
+    PORT_3000_PID=$(echo "$PORT_3000_PID" | tr -cd '0-9\n' | head -1)
+    
+    if [ -n "$PORT_3000_PID" ] && [ "$PORT_3000_PID" -gt 0 ] 2>/dev/null; then
+        PROCESS_NAME=$($SUDO_PREFIX ps -p "$PORT_3000_PID" -o comm= 2>/dev/null || echo "unknown")
+        log_warning "Port 3000 đang được sử dụng bởi process: $PROCESS_NAME (PID: $PORT_3000_PID)"
+        log_info "Đang kill process này..."
+        $SUDO_PREFIX kill -9 "$PORT_3000_PID" 2>/dev/null || true
+        sleep 1
+        log_success "Đã giải phóng port 3000"
+    fi
+fi
+
+# Đảm bảo không còn process nào đang dùng port 3000
+for i in {1..5}; do
+    if command -v lsof &> /dev/null; then
+        REMAINING_PID=$($SUDO_PREFIX lsof -ti :3000 2>/dev/null || echo "")
+    else
+        REMAINING_PID=""
+    fi
+    
+    if [ -z "$REMAINING_PID" ]; then
+        break
+    fi
+    
+    log_warning "Vẫn còn process đang dùng port 3000, đang kill..."
+    $SUDO_PREFIX kill -9 $REMAINING_PID 2>/dev/null || true
+    sleep 1
+done
+
+# Validate .env values trước khi khởi động
+log_info "Đang kiểm tra cấu hình .env..."
+if [ -f .env ]; then
+    # Kiểm tra RATE_LIMIT_WINDOW_MS
+    RATE_LIMIT_WINDOW_MS=$(grep -E "^RATE_LIMIT_WINDOW_MS=" .env 2>/dev/null | cut -d '=' -f2- | tr -d '"' | tr -d "'" | xargs || echo "")
+    if [ -n "$RATE_LIMIT_WINDOW_MS" ]; then
+        # Kiểm tra xem có phải số hợp lệ không
+        if ! echo "$RATE_LIMIT_WINDOW_MS" | grep -qE '^[0-9]+$' || [ "$RATE_LIMIT_WINDOW_MS" -lt 1 ] || [ "$RATE_LIMIT_WINDOW_MS" -gt 2147483647 ] 2>/dev/null; then
+            log_warning "RATE_LIMIT_WINDOW_MS trong .env có giá trị không hợp lệ: $RATE_LIMIT_WINDOW_MS"
+            log_info "Đang sửa thành giá trị mặc định: 900000 (15 phút)"
+            # Backup .env
+            cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
+            # Sửa giá trị
+            if grep -q "RATE_LIMIT_WINDOW_MS=" .env; then
+                sed -i "s|RATE_LIMIT_WINDOW_MS=.*|RATE_LIMIT_WINDOW_MS=900000|" .env
+            else
+                echo "RATE_LIMIT_WINDOW_MS=900000" >> .env
+            fi
+            log_success "Đã sửa RATE_LIMIT_WINDOW_MS thành 900000"
+        fi
+    fi
+    
+    # Kiểm tra các rate limit window khác
+    for VAR in "INCR_RATE_LIMIT_WINDOW_MS" "LOGIN_RATE_LIMIT_WINDOW_MS"; do
+        VAL=$(grep -E "^${VAR}=" .env 2>/dev/null | cut -d '=' -f2- | tr -d '"' | tr -d "'" | xargs || echo "")
+        if [ -n "$VAL" ]; then
+            if ! echo "$VAL" | grep -qE '^[0-9]+$' || [ "$VAL" -lt 1 ] || [ "$VAL" -gt 2147483647 ] 2>/dev/null; then
+                log_warning "${VAR} trong .env có giá trị không hợp lệ: $VAL"
+                DEFAULT_VAL="60000"
+                if [ "$VAR" = "LOGIN_RATE_LIMIT_WINDOW_MS" ]; then
+                    DEFAULT_VAL="900000"
+                fi
+                log_info "Đang sửa thành giá trị mặc định: $DEFAULT_VAL"
+                if grep -q "${VAR}=" .env; then
+                    sed -i "s|${VAR}=.*|${VAR}=${DEFAULT_VAL}|" .env
+                else
+                    echo "${VAR}=${DEFAULT_VAL}" >> .env
+                fi
+            fi
+        fi
+    done
 fi
 
 # Khởi động với PM2

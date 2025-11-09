@@ -23,15 +23,37 @@ module.exports = {
   rateLimit: {
     // General API rate limiting
     enabled: process.env.RATE_LIMIT_ENABLED !== 'false', // Default: enabled
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes default
+    windowMs: (() => {
+      const val = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000');
+      // Validate: must be between 1 and 2147483647 (max safe integer for MemoryStore)
+      if (isNaN(val) || val < 1 || val > 2147483647) {
+        console.warn(`Invalid RATE_LIMIT_WINDOW_MS: ${process.env.RATE_LIMIT_WINDOW_MS}, using default 900000 (15 minutes)`);
+        return 900000;
+      }
+      return val;
+    })(),
     maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '1000'), // 1000 requests per window default
     
     // Increment API rate limiting
-    incrementWindowMs: parseInt(process.env.INCR_RATE_LIMIT_WINDOW_MS || '60000'), // 1 minute default
+    incrementWindowMs: (() => {
+      const val = parseInt(process.env.INCR_RATE_LIMIT_WINDOW_MS || '60000');
+      if (isNaN(val) || val < 1 || val > 2147483647) {
+        console.warn(`Invalid INCR_RATE_LIMIT_WINDOW_MS: ${process.env.INCR_RATE_LIMIT_WINDOW_MS}, using default 60000 (1 minute)`);
+        return 60000;
+      }
+      return val;
+    })(),
     incrementMaxRequests: parseInt(process.env.INCR_MAX_PER_MINUTE || '60'),
     
     // Login rate limiting
-    loginWindowMs: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes default
+    loginWindowMs: (() => {
+      const val = parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW_MS || '900000');
+      if (isNaN(val) || val < 1 || val > 2147483647) {
+        console.warn(`Invalid LOGIN_RATE_LIMIT_WINDOW_MS: ${process.env.LOGIN_RATE_LIMIT_WINDOW_MS}, using default 900000 (15 minutes)`);
+        return 900000;
+      }
+      return val;
+    })(),
     loginMaxRequests: parseInt(process.env.LOGIN_RATE_LIMIT_MAX_REQUESTS || '5')
   },
   
