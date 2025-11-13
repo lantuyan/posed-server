@@ -144,6 +144,13 @@ if (!fs.existsSync(uploadsDir)) {
   logger.info(`Created uploads directory: ${uploadsDir}`);
 }
 
+// Create user submissions directory if it doesn't exist
+const userUploadsDir = path.join(process.cwd(), config.userUploadPath);
+if (!fs.existsSync(userUploadsDir)) {
+  fs.mkdirSync(userUploadsDir, { recursive: true });
+  logger.info(`Created user submissions directory: ${userUploadsDir}`);
+}
+
 logger.info(`Serving static files from: ${uploadsDir}`);
 logger.info(`Static files accessible at: /uploads/*`);
 

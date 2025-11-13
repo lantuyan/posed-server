@@ -68,9 +68,13 @@ const verifyStaticUser = (req, res, next) => {
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
     
     try {
-      authService.verifyUserToken(token);
+      const tokenInfo = authService.verifyUserToken(token);
       
-      logger.debug('User token verified', { ip: req.ip });
+      req.publicAuth = tokenInfo;
+      logger.debug('User token verified', { 
+        ip: req.ip,
+        tokenTime: tokenInfo.tokenTimeString
+      });
       next();
     } catch (error) {
       // Handle specific error cases

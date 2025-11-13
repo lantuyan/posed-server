@@ -17,6 +17,18 @@ const storage = multer.diskStorage({
   }
 });
 
+// Configure multer storage for user submissions
+const userStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, config.userUploadPath);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const filename = `${crypto.randomUUID()}${ext}`;
+    cb(null, filename);
+  }
+});
+
 // File filter to check MIME types
 const fileFilter = (req, file, cb) => {
   if (config.allowedMimeTypes.includes(file.mimetype)) {
@@ -41,11 +53,23 @@ const upload = multer({
   }
 });
 
+const userUpload = multer({
+  storage: userStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: config.maxImageSizeBytes,
+    files: 1
+  }
+});
+
 // Middleware for single file upload
 const uploadSingle = upload.single('image');
 
 // Middleware for multiple files upload
 const uploadMultiple = upload.array('images', 10);
+
+// Middleware for single user submission upload
+const uploadUserSingle = userUpload.single('image');
 
 // Middleware for category files upload (icon and thumbnail)
 const uploadCategoryFiles = upload.fields([
@@ -92,5 +116,6 @@ module.exports = {
   uploadSingle,
   uploadMultiple,
   uploadCategoryFiles,
+  uploadUserSingle,
   handleUploadError
 };

@@ -139,7 +139,7 @@ class AuthService {
    * Verify encrypted user token
    * Decrypts token, extracts static token and timestamp, then validates
    * @param {string} encryptedToken - Base64 encoded encrypted token
-   * @returns {boolean} True if token is valid
+   * @returns {{ isValid: boolean, tokenTime: Date, tokenTimeString: string, timeDiffSeconds: number }}
    * @throws {Error} If token is invalid, expired, or decryption fails
    */
   verifyUserToken(encryptedToken) {
@@ -236,12 +236,19 @@ class AuthService {
         throw new Error('Token expired');
       }
 
+      const timeDiffRounded = Math.round(timeDiffSeconds);
+
       logger.debug('User token verified successfully', {
-        timeDiffSeconds: Math.round(timeDiffSeconds),
+        timeDiffSeconds: timeDiffRounded,
         tokenTime: timeString
       });
 
-      return true;
+      return {
+        isValid: true,
+        tokenTime,
+        tokenTimeString: timeString,
+        timeDiffSeconds: timeDiffRounded
+      };
     } catch (error) {
       if (error.message === 'Token expired' || error.message === 'Invalid token' || error.message === 'Decryption failed') {
         throw error;

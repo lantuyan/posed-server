@@ -2,10 +2,85 @@ const express = require('express');
 const router = express.Router();
 
 const Image = require('../models/Image');
+const userSubmissionController = require('../controllers/userSubmissionController');
 const { verifyStaticUser } = require('../middlewares/authJwt');
 const { validateObjectId, validateIncrement } = require('../middlewares/validateRequest');
 const { incrementLimiter } = require('../middlewares/rateLimiter');
+const { uploadUserSingle, handleUploadError } = require('../middlewares/upload');
 const logger = require('../utils/logger');
+
+/**
+ * @swagger
+ * /api/public/images/upload:
+ *   post:
+ *     summary: Submit image for review
+ *     description: Upload a single image that will be stored separately for admin review and categorization.
+ *     tags: [Public]
+ *     security:
+ *       - StaticTokenAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: Single image file to upload
+ *     responses:
+ *       201:
+ *         description: Image submitted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Image submitted successfully and pending review"
+ *                 submission:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                       example: "pending"
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *       400:
+ *         description: Invalid request or file
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Unauthorized - Invalid or expired token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       413:
+ *         description: File too large
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+
+// POST /api/public/images/upload - User submission upload (single file)
+router.post('/images/upload',
+  verifyStaticUser,
+  uploadUserSingle,
+  handleUploadError,
+  userSubmissionController.uploadUserImage
+);
 
 /**
  * @swagger

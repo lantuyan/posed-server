@@ -16,6 +16,7 @@ module.exports = {
   
   // Upload Configuration
   uploadPath: process.env.UPLOAD_PATH || 'uploads/images',
+  userUploadPath: process.env.USER_UPLOAD_PATH || 'uploads/user-submissions',
   maxImageSizeBytes: parseInt(process.env.MAX_IMAGE_SIZE || '10485760'), // 10 MB
   allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
   imagesArrayMaxDefault: parseInt(process.env.IMAGES_ARRAY_MAX_DEFAULT || '1000'),
