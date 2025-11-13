@@ -59,7 +59,11 @@ const UserImageSubmissionSchema = new mongoose.Schema({
   reviewedAt: {
     type: Date
   },
-  submissionMeta: submissionMetaSchema
+  submissionMeta: submissionMetaSchema,
+  linkedImageId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Image'
+  }
 }, {
   timestamps: true
 });

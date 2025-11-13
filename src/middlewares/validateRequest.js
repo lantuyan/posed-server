@@ -195,6 +195,75 @@ const validatePagination = [
   handleValidationErrors
 ];
 
+const submissionStatuses = ['pending', 'approved', 'rejected'];
+
+const validateSubmissionList = [
+  query('status')
+    .optional()
+    .isIn(submissionStatuses)
+    .withMessage(`Status must be one of: ${submissionStatuses.join(', ')}`),
+
+  query('search')
+    .optional()
+    .trim()
+    .isLength({ max: 200 })
+    .withMessage('Search term must not exceed 200 characters'),
+
+  query('sort')
+    .optional()
+    .custom((value) => {
+      const allowedFields = ['createdAt', 'updatedAt', 'status', 'reviewedAt'];
+      const [field, order = 'desc'] = value.split(':');
+      if (!allowedFields.includes(field)) {
+        throw new Error(`Sort field must be one of: ${allowedFields.join(', ')}`);
+      }
+      if (!['asc', 'desc'].includes(order)) {
+        throw new Error('Sort order must be either asc or desc');
+      }
+      return true;
+    }),
+
+  handleValidationErrors
+];
+
+const validateSubmissionUpdate = [
+  body('status')
+    .notEmpty()
+    .withMessage('Status is required')
+    .isIn(submissionStatuses)
+    .withMessage(`Status must be one of: ${submissionStatuses.join(', ')}`),
+
+  body('categoryIds')
+    .if(body('status').equals('approved'))
+    .isArray({ min: 1 })
+    .withMessage('categoryIds must be a non-empty array when approving'),
+
+  body('categoryIds.*')
+    .if(body('status').equals('approved'))
+    .isMongoId()
+    .withMessage('Each categoryId must be a valid MongoDB ObjectId'),
+
+  body('reviewNotes')
+    .optional()
+    .trim()
+    .isLength({ max: 2000 })
+    .withMessage('Review notes must not exceed 2000 characters'),
+
+  body('title')
+    .optional()
+    .trim()
+    .isLength({ max: 200 })
+    .withMessage('Title must not exceed 200 characters'),
+
+  body('description')
+    .optional()
+    .trim()
+    .isLength({ max: 1000 })
+    .withMessage('Description must not exceed 1000 characters'),
+
+  handleValidationErrors
+];
+
 module.exports = {
   handleValidationErrors,
   validateLogin,
@@ -203,6 +272,8 @@ module.exports = {
   validateImageMetadata,
   validateIncrement,
   validateObjectId,
-  validatePagination
+  validatePagination,
+  validateSubmissionList,
+  validateSubmissionUpdate
 };
 

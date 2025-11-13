@@ -178,6 +178,119 @@ const options = {
             }
           }
         },
+        UserSubmission: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              example: '68e0c70a77bc9f407c737db3'
+            },
+            originalFileName: {
+              type: 'string',
+              example: 'user-photo.jpg'
+            },
+            fileName: {
+              type: 'string',
+              example: '7b7f2e6b-9c61-4f4d-9c19-5a1c1bb9f772.jpg'
+            },
+            filePath: {
+              type: 'string',
+              example: 'uploads/user-submissions/7b7f2e6b-9c61-4f4d-9c19-5a1c1bb9f772.jpg'
+            },
+            fileUrl: {
+              type: 'string',
+              example: 'https://api.pose.ai/uploads/user-submissions/7b7f2e6b-9c61-4f4d-9c19-5a1c1bb9f772.jpg'
+            },
+            mimeType: {
+              type: 'string',
+              example: 'image/jpeg'
+            },
+            size: {
+              type: 'integer',
+              example: 1048576
+            },
+            width: {
+              type: 'integer',
+              example: 1080
+            },
+            height: {
+              type: 'integer',
+              example: 1920
+            },
+            status: {
+              type: 'string',
+              example: 'pending'
+            },
+            assignedCategories: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  title: { type: 'string' }
+                }
+              }
+            },
+            reviewNotes: {
+              type: 'string',
+              example: 'Looks good. Assigning to portrait category.'
+            },
+            reviewedBy: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                id: { type: 'string' },
+                username: { type: 'string' },
+                role: { type: 'string' }
+              }
+            },
+            reviewedAt: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true
+            },
+            linkedImageId: {
+              type: 'string',
+              nullable: true,
+              example: '68e0c70a77bc9f407c737db4'
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time'
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time'
+            },
+            submissionMeta: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                tokenTime: {
+                  type: 'string',
+                  format: 'date-time',
+                  nullable: true
+                },
+                tokenTimeString: {
+                  type: 'string',
+                  example: '2025-11-13 22:40:00'
+                },
+                timeDiffSeconds: {
+                  type: 'integer',
+                  example: 5
+                },
+                ipAddress: {
+                  type: 'string',
+                  example: '192.168.1.10'
+                },
+                userAgent: {
+                  type: 'string',
+                  example: 'PoseApp/1.0 (iPhone; iOS 18.0)'
+                }
+              }
+            }
+          }
+        },
         LoginRequest: {
           type: 'object',
           required: ['username', 'password'],
