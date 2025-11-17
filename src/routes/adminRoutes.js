@@ -2,8 +2,24 @@ const express = require('express');
 const router = express.Router();
 
 const authController = require('../controllers/authController');
+const categoryController = require('../controllers/categoryController');
+const imageController = require('../controllers/imageController');
 const { verifyAdminOrEditor, verifyStaticUser, requireAdmin } = require('../middlewares/authJwt');
-const { validateLogin, validatePagination, validateObjectId, validateSubmissionList, validateSubmissionUpdate } = require('../middlewares/validateRequest');
+const { 
+  validateLogin, 
+  validatePagination, 
+  validateObjectId, 
+  validateSubmissionList, 
+  validateSubmissionUpdate,
+  validateCategory,
+  validateCategoryEdit,
+  validateImageMetadata
+} = require('../middlewares/validateRequest');
+const {
+  uploadCategoryFiles,
+  uploadMultiple,
+  handleUploadError
+} = require('../middlewares/upload');
 const userSubmissionAdminController = require('../controllers/userSubmissionAdminController');
 const { loginLimiter } = require('../middlewares/rateLimiter');
 
@@ -115,6 +131,348 @@ router.get('/test-admin', verifyAdminOrEditor, authController.testAdminAuth);
  *               $ref: '#/components/schemas/Error'
  */
 router.get('/test-public', verifyStaticUser, authController.testStaticAuth);
+
+/**
+ * @swagger
+ * /api/admin/categories:
+ *   get:
+ *     summary: Get all categories (admin)
+ *     description: Retrieve paginated list of categories using admin authentication.
+ *     tags: [Admin - Categories]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *         description: Number of items per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search term for title and description
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
+ *         description: Filter by status (default shows active categories)
+ *     responses:
+ *       200:
+ *         description: Categories retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/categories',
+  verifyAdminOrEditor,
+  validatePagination,
+  categoryController.getCategories
+);
+
+/**
+ * @swagger
+ * /api/admin/categories:
+ *   post:
+ *     summary: Create a new category (admin)
+ *     description: Same payload as public category creation but scoped under /admin with JWT auth.
+ *     tags: [Admin - Categories]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             $ref: '#/components/schemas/CategoryRequest'
+ *     responses:
+ *       201:
+ *         description: Category created successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/categories',
+  verifyAdminOrEditor,
+  uploadCategoryFiles,
+  handleUploadError,
+  validateCategory,
+  categoryController.createCategory
+);
+
+/**
+ * @swagger
+ * /api/admin/categories/{id}:
+ *   put:
+ *     summary: Update category (admin)
+ *     description: Full update for the specified category ID.
+ *     tags: [Admin - Categories]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             $ref: '#/components/schemas/CategoryRequest'
+ *     responses:
+ *       200:
+ *         description: Category updated successfully
+ *       400:
+ *         description: Validation error or invalid ID
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Category not found
+ */
+router.put('/categories/:id',
+  verifyAdminOrEditor,
+  validateObjectId,
+  uploadCategoryFiles,
+  handleUploadError,
+  validateCategory,
+  categoryController.updateCategory
+);
+
+/**
+ * @swagger
+ * /api/admin/categories/{id}:
+ *   patch:
+ *     summary: Partially update category (admin)
+ *     description: Partial update for the specified category ID.
+ *     tags: [Admin - Categories]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             $ref: '#/components/schemas/CategoryEditRequest'
+ *     responses:
+ *       200:
+ *         description: Category updated successfully
+ *       400:
+ *         description: Validation error or invalid ID
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Category not found
+ */
+router.patch('/categories/:id',
+  verifyAdminOrEditor,
+  validateObjectId,
+  uploadCategoryFiles,
+  handleUploadError,
+  validateCategoryEdit,
+  categoryController.editCategory
+);
+
+/**
+ * @swagger
+ * /api/admin/categories/{id}:
+ *   delete:
+ *     summary: Delete category (admin)
+ *     description: Soft delete the specified category.
+ *     tags: [Admin - Categories]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Category deleted successfully
+ *       400:
+ *         description: Invalid ID
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Category not found
+ */
+router.delete('/categories/:id',
+  verifyAdminOrEditor,
+  validateObjectId,
+  categoryController.deleteCategory
+);
+
+/**
+ * @swagger
+ * /api/admin/images:
+ *   get:
+ *     summary: Get all images (admin)
+ *     description: Retrieve paginated list of images using admin authentication.
+ *     tags: [Admin - Images]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *         description: Number of items per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search term for title and description
+ *       - in: query
+ *         name: categoryId
+ *         schema:
+ *           type: string
+ *         description: Filter by category ID
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *           example: createdAt:desc
+ *         description: Sort field and order (field:direction)
+ *     responses:
+ *       200:
+ *         description: Images retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/images',
+  verifyAdminOrEditor,
+  validatePagination,
+  imageController.getImages
+);
+
+/**
+ * @swagger
+ * /api/admin/images:
+ *   post:
+ *     summary: Upload images (admin)
+ *     description: Upload one or multiple images with metadata under the admin namespace.
+ *     tags: [Admin - Images]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             $ref: '#/components/schemas/ImageUploadRequest'
+ *     responses:
+ *       201:
+ *         description: Images uploaded successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/images',
+  verifyAdminOrEditor,
+  uploadMultiple,
+  handleUploadError,
+  imageController.uploadImages
+);
+
+/**
+ * @swagger
+ * /api/admin/images/{id}:
+ *   put:
+ *     summary: Update image metadata (admin)
+ *     description: Update metadata for a single image.
+ *     tags: [Admin - Images]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ImageMetadataRequest'
+ *     responses:
+ *       200:
+ *         description: Image updated successfully
+ *       400:
+ *         description: Validation error or invalid ID
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Image not found
+ */
+router.put('/images/:id',
+  verifyAdminOrEditor,
+  validateObjectId,
+  validateImageMetadata,
+  imageController.updateImage
+);
+
+/**
+ * @swagger
+ * /api/admin/images/{id}:
+ *   delete:
+ *     summary: Delete image (admin)
+ *     description: Soft delete an image record.
+ *     tags: [Admin - Images]
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Image deleted successfully
+ *       400:
+ *         description: Invalid ID
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Image not found
+ */
+router.delete('/images/:id',
+  verifyAdminOrEditor,
+  validateObjectId,
+  imageController.deleteImage
+);
 
 /**
  * @swagger
