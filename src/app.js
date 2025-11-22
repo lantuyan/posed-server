@@ -21,11 +21,17 @@ const publicRoutes = require('./routes/publicRoutes');
 const app = express();
 
 // Security middleware - skip for Swagger routes
+const helmetMiddleware = helmet({
+  // Allow assets (uploads) to be loaded from other origins (e.g. frontend dev server)
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  // Disable COEP to avoid blocking cross-origin resources that don't send CORP
+  crossOriginEmbedderPolicy: false
+});
 app.use((req, res, next) => {
   if (req.path.startsWith('/api-docs')) {
     return next();
   }
-  helmet()(req, res, next);
+  helmetMiddleware(req, res, next);
 });
 
 // SSL Pinning Information Endpoint (OPTIONAL)
@@ -157,7 +163,12 @@ logger.info(`Static files accessible at: /uploads/*`);
 // Serve static files from uploads directory (must be before other routes)
 app.use('/uploads', express.static(uploadsDir, {
   index: false,
-  dotfiles: 'ignore'
+  dotfiles: 'ignore',
+  setHeaders: (res) => {
+    // Ensure browsers permit cross-origin image loads (avoid CORP/CORS blocks)
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
 }));
 
 // Alternative route for serving images (fallback)
@@ -260,4 +271,3 @@ process.on('SIGINT', async () => {
 });
 
 module.exports = { app, connectDB };
-
