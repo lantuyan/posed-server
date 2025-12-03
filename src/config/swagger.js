@@ -100,6 +100,11 @@ const options = {
               type: 'boolean',
               example: true
             },
+            priority: {
+              type: 'integer',
+              example: 1,
+              description: 'Lower number means higher priority. Each value can only be used once.'
+            },
             createdAt: {
               type: 'string',
               format: 'date-time'

@@ -32,6 +32,9 @@ const { uploadCategoryFiles, handleUploadError } = require('../middlewares/uploa
  *                 maxLength: 500
  *               status:
  *                 type: boolean
+ *               priority:
+ *                 type: integer
+ *                 description: Optional unique priority value. Lower numbers are shown first.
  *               newId:
  *                 type: string
  *                 description: Optional new MongoDB ObjectId to replace the category id
@@ -80,7 +83,7 @@ router.post('/',
  * /api/categories:
  *   get:
  *     summary: Get all categories
- *     description: Get paginated list of all active categories (public)
+ *     description: Get paginated list of all active categories ordered by priority (public)
  *     tags: [Categories]
  *     security:
  *       - StaticTokenAuth: []
@@ -245,6 +248,9 @@ router.get('/:id',
  *                 maxLength: 500
  *               status:
  *                 type: boolean
+ *               priority:
+ *                 type: integer
+ *                 description: Optional unique priority value. Lower numbers are shown first.
  *               newId:
  *                 type: string
  *                 description: Optional new MongoDB ObjectId to replace the category id
@@ -326,6 +332,9 @@ router.put('/:id',
  *                 maxLength: 500
  *               status:
  *                 type: boolean
+ *               priority:
+ *                 type: integer
+ *                 description: Optional unique priority value. Lower numbers are shown first.
  *               icon:
  *                 type: string
  *                 format: binary

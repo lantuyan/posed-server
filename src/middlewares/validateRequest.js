@@ -71,6 +71,12 @@ const validateCategory = [
     .isBoolean()
     .withMessage('Status must be a boolean value'),
 
+  body('priority')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Priority must be a positive integer')
+    .toInt(),
+
   body('newId')
     .optional()
     .isMongoId()
@@ -99,6 +105,12 @@ const validateCategoryEdit = [
     .optional()
     .isBoolean()
     .withMessage('Status must be a boolean value'),
+
+  body('priority')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Priority must be a positive integer')
+    .toInt(),
 
   body('newId')
     .optional()

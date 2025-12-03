@@ -24,6 +24,12 @@ const CategorySchema = new mongoose.Schema({
   status: { 
     type: Boolean, 
     default: true 
+  },
+  priority: {
+    type: Number,
+    min: 1,
+    sparse: true,
+    unique: true
   }
 }, { 
   timestamps: true 
@@ -34,4 +40,3 @@ CategorySchema.index({ status: 1 });
 CategorySchema.index({ title: 1 });
 
 module.exports = mongoose.model('Category', CategorySchema);
-

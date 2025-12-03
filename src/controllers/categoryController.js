@@ -8,6 +8,8 @@ const config = require('../config');
 const { getImageUrl } = require('../utils/urlHelper');
 const imageService = require('../services/imageService');
 
+const PRIORITY_FALLBACK = Number.MAX_SAFE_INTEGER;
+
 const formatCategoryResponse = (category) => ({
   id: category._id,
   title: category.title,
@@ -15,15 +17,35 @@ const formatCategoryResponse = (category) => ({
   icon: category.icon ? getImageUrl(category.icon) : null,
   thumbnail: category.thumbnail ? getImageUrl(category.thumbnail) : null,
   status: category.status,
+  priority: category.priority,
   createdAt: category.createdAt,
   updatedAt: category.updatedAt
 });
+
+const findPriorityConflict = async (priority, excludeCategoryId) => {
+  if (priority === undefined || priority === null) {
+    return null;
+  }
+
+  const query = { priority };
+  if (excludeCategoryId) {
+    query._id = { $ne: excludeCategoryId };
+  }
+
+  return Category.findOne(query).select('_id title');
+};
+
+const isPriorityDuplicateError = (error) =>
+  error?.code === 11000 && (error.keyPattern?.priority || error.message?.includes('priority'));
 
 /**
  * Create a new category
  */
 const createCategory = asyncHandler(async (req, res) => {
   const { title, description, status = true } = req.body;
+  const priority = req.body.priority === undefined || req.body.priority === null
+    ? undefined
+    : Number(req.body.priority);
   const files = req.files;
 
   // Handle file uploads
@@ -39,19 +61,44 @@ const createCategory = asyncHandler(async (req, res) => {
     }
   }
 
+  const priorityConflict = await findPriorityConflict(priority);
+  if (priorityConflict) {
+    return res.status(400).json({
+      success: false,
+      error: `Priority ${priority} is already assigned to another category`
+    });
+  }
+
   const category = new Category({
     title,
     description,
     icon: iconPath,
     thumbnail: thumbnailPath,
-    status
+    status,
+    priority
   });
 
-  await category.save();
+  try {
+    await category.save();
+  } catch (error) {
+    if (isPriorityDuplicateError(error)) {
+      logger.warn('Duplicate priority on category create', {
+        priority,
+        attemptedTitle: title,
+        userId: req.user?.userId
+      });
+      return res.status(400).json({
+        success: false,
+        error: `Priority ${priority} is already assigned to another category`
+      });
+    }
+    throw error;
+  }
 
   logger.info('Category created', {
     categoryId: category._id,
     title: category.title,
+    priority: category.priority,
     userId: req.user?.userId
   });
 
@@ -84,12 +131,30 @@ const getCategories = asyncHandler(async (req, res) => {
   const totalItems = await Category.countDocuments(query);
   const totalPages = Math.ceil(totalItems / limit);
 
-  // Get categories
-  const categories = await Category.find(query)
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit)
-    .select('title description icon thumbnail status createdAt updatedAt');
+  // Get categories with priority ordering (lowest priority value first, unassigned at the end)
+  const categories = await Category.aggregate([
+    { $match: query },
+    { 
+      $addFields: { 
+        prioritySort: { $ifNull: ['$priority', PRIORITY_FALLBACK] } 
+      } 
+    },
+    { $sort: { prioritySort: 1, createdAt: -1 } },
+    { $skip: skip },
+    { $limit: limit },
+    { 
+      $project: { 
+        title: 1,
+        description: 1,
+        icon: 1,
+        thumbnail: 1,
+        status: 1,
+        priority: 1,
+        createdAt: 1,
+        updatedAt: 1
+      } 
+    }
+  ]);
 
   logger.info('Categories retrieved', {
     totalItems,
@@ -203,6 +268,9 @@ const getCategoryById = asyncHandler(async (req, res) => {
 const handleCategoryUpdate = async (req, res, actionLabel) => {
   const { id } = req.params;
   const { title, description, status, newId } = req.body;
+  const priority = req.body.priority === undefined || req.body.priority === null
+    ? undefined
+    : Number(req.body.priority);
   const files = req.files;
 
   const category = await Category.findById(id);
@@ -235,6 +303,16 @@ const handleCategoryUpdate = async (req, res, actionLabel) => {
   if (title !== undefined) category.title = title;
   if (description !== undefined) category.description = description;
   if (status !== undefined) category.status = status;
+  if (priority !== undefined && priority !== category.priority) {
+    const priorityConflict = await findPriorityConflict(priority, category._id);
+    if (priorityConflict) {
+      return res.status(400).json({
+        success: false,
+        error: `Priority ${priority} is already assigned to another category`
+      });
+    }
+    category.priority = priority;
+  }
 
   const oldCategoryId = category._id.toString();
   const normalizedNewId = newId?.toString();
@@ -267,13 +345,14 @@ const handleCategoryUpdate = async (req, res, actionLabel) => {
       icon: category.icon,
       thumbnail: category.thumbnail,
       status: category.status,
+      priority: category.priority,
       createdAt: category.createdAt,
       updatedAt: new Date()
     };
 
-    const newCategory = await Category.create(newCategoryData);
-
+    let newCategory;
     try {
+      newCategory = await Category.create(newCategoryData);
       const imageUpdateResult = await Image.updateMany(
         { categoryIds: category._id },
         { $set: { 'categoryIds.$[elem]': newCategoryId } },
@@ -284,12 +363,29 @@ const handleCategoryUpdate = async (req, res, actionLabel) => {
       await category.deleteOne();
       savedCategory = newCategory;
     } catch (error) {
-      // Rollback if remapping fails
-      await Category.deleteOne({ _id: newCategoryId });
+      if (newCategory) {
+        await Category.deleteOne({ _id: newCategoryId });
+      }
+      if (isPriorityDuplicateError(error)) {
+        return res.status(400).json({
+          success: false,
+          error: `Priority ${category.priority} is already assigned to another category`
+        });
+      }
       throw error;
     }
   } else {
-    await category.save();
+    try {
+      await category.save();
+    } catch (error) {
+      if (isPriorityDuplicateError(error)) {
+        return res.status(400).json({
+          success: false,
+          error: `Priority ${category.priority} is already assigned to another category`
+        });
+      }
+      throw error;
+    }
   }
 
   logger.info(`Category ${actionLabel}`, {
@@ -298,6 +394,7 @@ const handleCategoryUpdate = async (req, res, actionLabel) => {
     idChanged: shouldChangeId,
     imagesUpdated,
     title: savedCategory.title,
+    priority: savedCategory.priority,
     userId: req.user?.userId
   });
 
