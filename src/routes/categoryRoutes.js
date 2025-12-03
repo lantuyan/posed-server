@@ -32,6 +32,9 @@ const { uploadCategoryFiles, handleUploadError } = require('../middlewares/uploa
  *                 maxLength: 500
  *               status:
  *                 type: boolean
+ *               newId:
+ *                 type: string
+ *                 description: Optional new MongoDB ObjectId to replace the category id
  *               icon:
  *                 type: string
  *                 format: binary
@@ -242,6 +245,9 @@ router.get('/:id',
  *                 maxLength: 500
  *               status:
  *                 type: boolean
+ *               newId:
+ *                 type: string
+ *                 description: Optional new MongoDB ObjectId to replace the category id
  *               icon:
  *                 type: string
  *                 format: binary

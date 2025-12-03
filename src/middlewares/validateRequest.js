@@ -70,6 +70,11 @@ const validateCategory = [
     .optional()
     .isBoolean()
     .withMessage('Status must be a boolean value'),
+
+  body('newId')
+    .optional()
+    .isMongoId()
+    .withMessage('newId must be a valid MongoDB ObjectId'),
   
   handleValidationErrors
 ];
@@ -94,6 +99,11 @@ const validateCategoryEdit = [
     .optional()
     .isBoolean()
     .withMessage('Status must be a boolean value'),
+
+  body('newId')
+    .optional()
+    .isMongoId()
+    .withMessage('newId must be a valid MongoDB ObjectId'),
   
   handleValidationErrors
 ];

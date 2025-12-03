@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Category = require('../models/Category');
 const Image = require('../models/Image');
 const { asyncHandler } = require('../middlewares/errorHandler');
@@ -6,6 +7,17 @@ const logger = require('../utils/logger');
 const config = require('../config');
 const { getImageUrl } = require('../utils/urlHelper');
 const imageService = require('../services/imageService');
+
+const formatCategoryResponse = (category) => ({
+  id: category._id,
+  title: category.title,
+  description: category.description,
+  icon: category.icon ? getImageUrl(category.icon) : null,
+  thumbnail: category.thumbnail ? getImageUrl(category.thumbnail) : null,
+  status: category.status,
+  createdAt: category.createdAt,
+  updatedAt: category.updatedAt
+});
 
 /**
  * Create a new category
@@ -45,16 +57,7 @@ const createCategory = asyncHandler(async (req, res) => {
 
   res.status(201).json({
     success: true,
-    category: {
-      id: category._id,
-      title: category.title,
-      description: category.description,
-      icon: category.icon ? getImageUrl(category.icon) : null,
-      thumbnail: category.thumbnail ? getImageUrl(category.thumbnail) : null,
-      status: category.status,
-      createdAt: category.createdAt,
-      updatedAt: category.updatedAt
-    }
+    category: formatCategoryResponse(category)
   });
 });
 
@@ -101,16 +104,7 @@ const getCategories = asyncHandler(async (req, res) => {
     totalItems,
     totalPages,
     currentPage: page,
-    items: categories.map(category => ({
-      id: category._id,
-      title: category.title,
-      description: category.description,
-      icon: category.icon ? getImageUrl(category.icon) : null,
-      thumbnail: category.thumbnail ? getImageUrl(category.thumbnail) : null,
-      status: category.status,
-      createdAt: category.createdAt,
-      updatedAt: category.updatedAt
-    }))
+    items: categories.map(formatCategoryResponse)
   });
 });
 
@@ -183,16 +177,7 @@ const getCategoryById = asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    category: {
-      id: category._id,
-      title: category.title,
-      description: category.description,
-      icon: category.icon ? getImageUrl(category.icon) : null,
-      thumbnail: category.thumbnail ? getImageUrl(category.thumbnail) : null,
-      status: category.status,
-      createdAt: category.createdAt,
-      updatedAt: category.updatedAt
-    },
+    category: formatCategoryResponse(category),
     images: images.map(image => ({
       id: image._id,
       title: image.title,
@@ -215,9 +200,9 @@ const getCategoryById = asyncHandler(async (req, res) => {
 /**
  * Update category
  */
-const updateCategory = asyncHandler(async (req, res) => {
+const handleCategoryUpdate = async (req, res, actionLabel) => {
   const { id } = req.params;
-  const { title, description, status } = req.body;
+  const { title, description, status, newId } = req.body;
   const files = req.files;
 
   const category = await Category.findById(id);
@@ -251,89 +236,86 @@ const updateCategory = asyncHandler(async (req, res) => {
   if (description !== undefined) category.description = description;
   if (status !== undefined) category.status = status;
 
-  await category.save();
+  const oldCategoryId = category._id.toString();
+  const normalizedNewId = newId?.toString();
+  const shouldChangeId = normalizedNewId && normalizedNewId !== oldCategoryId;
 
-  logger.info('Category updated', {
-    categoryId: id,
-    title: category.title,
+  let savedCategory = category;
+  let imagesUpdated = 0;
+
+  if (shouldChangeId) {
+    if (!mongoose.Types.ObjectId.isValid(normalizedNewId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'newId must be a valid MongoDB ObjectId'
+      });
+    }
+
+    const newCategoryId = new mongoose.Types.ObjectId(normalizedNewId);
+    const existingCategory = await Category.findById(newCategoryId);
+    if (existingCategory) {
+      return res.status(400).json({
+        success: false,
+        error: 'Category with the provided newId already exists'
+      });
+    }
+
+    const newCategoryData = {
+      _id: newCategoryId,
+      title: category.title,
+      description: category.description,
+      icon: category.icon,
+      thumbnail: category.thumbnail,
+      status: category.status,
+      createdAt: category.createdAt,
+      updatedAt: new Date()
+    };
+
+    const newCategory = await Category.create(newCategoryData);
+
+    try {
+      const imageUpdateResult = await Image.updateMany(
+        { categoryIds: category._id },
+        { $set: { 'categoryIds.$[elem]': newCategoryId } },
+        { arrayFilters: [{ elem: { $eq: category._id } }] }
+      );
+
+      imagesUpdated = imageUpdateResult.modifiedCount;
+      await category.deleteOne();
+      savedCategory = newCategory;
+    } catch (error) {
+      // Rollback if remapping fails
+      await Category.deleteOne({ _id: newCategoryId });
+      throw error;
+    }
+  } else {
+    await category.save();
+  }
+
+  logger.info(`Category ${actionLabel}`, {
+    categoryId: savedCategory._id,
+    previousCategoryId: id,
+    idChanged: shouldChangeId,
+    imagesUpdated,
+    title: savedCategory.title,
     userId: req.user?.userId
   });
 
   res.json({
     success: true,
-    category: {
-      id: category._id,
-      title: category.title,
-      description: category.description,
-      icon: category.icon ? getImageUrl(category.icon) : null,
-      thumbnail: category.thumbnail ? getImageUrl(category.thumbnail) : null,
-      status: category.status,
-      createdAt: category.createdAt,
-      updatedAt: category.updatedAt
-    }
+    category: formatCategoryResponse(savedCategory)
   });
+};
+
+const updateCategory = asyncHandler(async (req, res) => {
+  await handleCategoryUpdate(req, res, 'updated');
 });
 
 /**
  * Edit category (PATCH - partial update)
  */
 const editCategory = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { title, description, status } = req.body;
-  const files = req.files;
-
-  const category = await Category.findById(id);
-  if (!category) {
-    return res.status(404).json({
-      success: false,
-      error: 'Category not found'
-    });
-  }
-
-  // Handle file uploads and cleanup old files
-  if (files) {
-    if (files.icon && files.icon[0]) {
-      // Delete old icon file if exists
-      if (category.icon) {
-        await imageService.deleteImageFile(category.icon);
-      }
-      category.icon = files.icon[0].path;
-    }
-    if (files.thumbnail && files.thumbnail[0]) {
-      // Delete old thumbnail file if exists
-      if (category.thumbnail) {
-        await imageService.deleteImageFile(category.thumbnail);
-      }
-      category.thumbnail = files.thumbnail[0].path;
-    }
-  }
-
-  // Update fields (all optional for PATCH)
-  if (title !== undefined) category.title = title;
-  if (description !== undefined) category.description = description;
-  if (status !== undefined) category.status = status;
-
-  await category.save();
-
-  logger.info('Category edited', {
-    categoryId: id,
-    title: category.title,
-    userId: req.user?.userId
-  });
-
-  res.json({
-    success: true,
-    category: {
-      id: category._id,
-      title: category.title,
-      description: category.description,
-      icon: category.icon ? getImageUrl(category.icon) : null,
-      thumbnail: category.thumbnail ? getImageUrl(category.thumbnail) : null,
-      status: category.status,
-      createdAt: category.createdAt,
-      updatedAt: category.updatedAt
-    }
-  });
+  await handleCategoryUpdate(req, res, 'edited');
 });
 
 /**
