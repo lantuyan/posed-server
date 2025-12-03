@@ -4,7 +4,7 @@ const router = express.Router();
 const imageController = require('../controllers/imageController');
 const { verifyAdminOrEditor, verifyStaticUser } = require('../middlewares/authJwt');
 const { validateImageMetadata, validateObjectId, validatePagination } = require('../middlewares/validateRequest');
-const { uploadMultiple, handleUploadError } = require('../middlewares/upload');
+const { uploadMultiple, uploadSingle, handleUploadError } = require('../middlewares/upload');
 
 /**
  * @swagger
@@ -218,7 +218,7 @@ router.get('/:id',
  * /api/images/{id}:
  *   put:
  *     summary: Update image metadata
- *     description: Update image metadata (admin/editor only)
+ *     description: Update image metadata or replace the stored file (admin/editor only)
  *     tags: [Images]
  *     security:
  *       - BearerAuth: []
@@ -235,6 +235,27 @@ router.get('/:id',
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/ImageMetadataRequest'
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: "Updated title"
+ *               description:
+ *                 type: string
+ *                 example: "Updated description"
+ *               status:
+ *                 type: boolean
+ *               categoryIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   example: "507f1f77bcf86cd799439011"
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: Optional new image file to replace existing
  *     responses:
  *       200:
  *         description: Image updated successfully
@@ -270,6 +291,8 @@ router.get('/:id',
 router.put('/:id', 
   verifyAdminOrEditor, 
   validateObjectId, 
+  uploadSingle,
+  handleUploadError,
   validateImageMetadata, 
   imageController.updateImage
 );
@@ -279,7 +302,7 @@ router.put('/:id',
  * /api/images/{id}:
  *   delete:
  *     summary: Delete image
- *     description: Soft delete image (admin/editor only)
+ *     description: Permanently delete image and its stored file (admin/editor only)
  *     tags: [Images]
  *     security:
  *       - BearerAuth: []

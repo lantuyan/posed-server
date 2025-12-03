@@ -254,29 +254,36 @@ const getImageById = asyncHandler(async (req, res) => {
 });
 
 /**
- * Update image metadata
+ * Update image metadata or replace the stored file
  */
 const updateImage = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { title, description, categoryIds } = req.body;
+  const { title, description, categoryIds, status } = req.body;
+  const uploadedFile = req.file;
 
   const image = await Image.findById(id);
   if (!image) {
+    if (uploadedFile?.path) {
+      await imageService.deleteImageFile(uploadedFile.path);
+    }
     return res.status(404).json({
       success: false,
       error: 'Image not found'
     });
   }
 
-  // Validate categoryIds if provided
-  if (categoryIds) {
-    const categoryIdsArray = Array.isArray(categoryIds) ? categoryIds : [categoryIds];
+  let categoryIdsArray;
+  if (categoryIds !== undefined) {
+    categoryIdsArray = Array.isArray(categoryIds) ? categoryIds : [categoryIds];
     const validCategories = await Category.find({
       _id: { $in: categoryIdsArray },
       status: true
     });
 
     if (validCategories.length !== categoryIdsArray.length) {
+      if (uploadedFile?.path) {
+        await imageService.deleteImageFile(uploadedFile.path);
+      }
       return res.status(400).json({
         success: false,
         error: 'One or more category IDs are invalid'
@@ -286,15 +293,43 @@ const updateImage = asyncHandler(async (req, res) => {
     image.categoryIds = categoryIdsArray;
   }
 
+  // If a new file is uploaded, replace the existing one
+  if (uploadedFile) {
+    let metadata;
+    try {
+      metadata = await imageService.getImageMetadata(uploadedFile.path);
+    } catch (error) {
+      await imageService.deleteImageFile(uploadedFile.path);
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid image file'
+      });
+    }
+
+    // Delete old file if exists to avoid orphaned files
+    if (image.filePath) {
+      await imageService.deleteImageFile(image.filePath);
+    }
+
+    image.filePath = uploadedFile.path;
+    image.fileName = uploadedFile.filename;
+    image.mimeType = metadata.mimeType;
+    image.size = metadata.size;
+    image.width = metadata.width;
+    image.height = metadata.height;
+  }
+
   // Update fields
   if (title !== undefined) image.title = title;
   if (description !== undefined) image.description = description;
+  if (status !== undefined) image.status = status;
 
   await image.save();
 
   logger.info('Image updated', {
     imageId: id,
     title: image.title,
+    replacedFile: Boolean(uploadedFile),
     userId: req.user?.userId
   });
 
@@ -321,7 +356,7 @@ const updateImage = asyncHandler(async (req, res) => {
 });
 
 /**
- * Soft delete image
+ * Permanently delete image
  */
 const deleteImage = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -334,11 +369,14 @@ const deleteImage = asyncHandler(async (req, res) => {
     });
   }
 
-  // Soft delete
-  image.status = false;
-  await image.save();
+  // Delete associated file if it exists
+  if (image.filePath) {
+    await imageService.deleteImageFile(image.filePath);
+  }
 
-  logger.info('Image soft deleted', {
+  await image.deleteOne();
+
+  logger.info('Image permanently deleted', {
     imageId: id,
     fileName: image.fileName,
     userId: req.user?.userId

@@ -372,7 +372,7 @@ router.patch('/:id',
  * /api/categories/{id}:
  *   delete:
  *     summary: Delete category
- *     description: Soft delete category (admin/editor only)
+ *     description: Permanently delete category and remove associated files (admin/editor only)
  *     tags: [Categories]
  *     security:
  *       - BearerAuth: []

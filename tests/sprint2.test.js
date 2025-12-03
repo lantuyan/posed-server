@@ -207,7 +207,22 @@ describe('Categories API', () => {
       categoryId = category._id;
     });
 
-    it('should soft delete category with admin token', async () => {
+    it('should delete category with admin token', async () => {
+      const image = await Image.create({
+        title: 'Cat Image',
+        description: 'belongs to category',
+        filePath: '/tmp/test-category.jpg',
+        fileName: 'test-category.jpg',
+        mimeType: 'image/jpeg',
+        size: 100,
+        width: 10,
+        height: 10,
+        categoryIds: [categoryId],
+        status: true,
+        countUsage: 0,
+        countFavorite: 0
+      });
+
       const response = await request(app)
         .delete(`/api/categories/${categoryId}`)
         .set('Authorization', `Bearer ${adminToken}`);
@@ -215,9 +230,14 @@ describe('Categories API', () => {
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
 
-      // Verify soft delete
+      // Verify hard delete
       const category = await Category.findById(categoryId);
-      expect(category.status).toBe(false);
+      expect(category).toBeNull();
+
+      // And remove reference from images
+      const updatedImage = await Image.findById(image._id);
+      expect(updatedImage).not.toBeNull();
+      expect(updatedImage.categoryIds).toHaveLength(0);
     });
 
     it('should reject delete without admin token', async () => {
@@ -394,6 +414,115 @@ describe('Images API', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.totalItems).toBe(2);
+    });
+  });
+
+  describe('PUT /api/images/:id', () => {
+    it('should replace image file and update metadata', async () => {
+      const uploadsDir = path.join(process.cwd(), config.uploadPath);
+      const oldFilePath = path.join(uploadsDir, `old-file-${Date.now()}.jpg`);
+      fs.writeFileSync(oldFilePath, 'old-file-data');
+
+      const image = await Image.create({
+        title: 'Old Title',
+        description: 'Old description',
+        filePath: oldFilePath,
+        fileName: path.basename(oldFilePath),
+        mimeType: 'image/jpeg',
+        size: 100,
+        width: 10,
+        height: 10,
+        categoryIds: [],
+        status: true,
+        countUsage: 0,
+        countFavorite: 0
+      });
+
+      const newUploadPath = path.join(__dirname, 'update-upload.jpg');
+      fs.writeFileSync(newUploadPath, 'new-file-data');
+
+      const imageService = require('../src/services/imageService');
+      const originalGetImageMetadata = imageService.getImageMetadata;
+      imageService.getImageMetadata = jest.fn().mockResolvedValue({
+        width: 640,
+        height: 480,
+        size: 2048,
+        mimeType: 'image/jpeg'
+      });
+
+      let updatedImage;
+      try {
+        const response = await request(app)
+          .put(`/api/images/${image._id}`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .field('title', 'Updated Title')
+          .field('status', 'false')
+          .attach('image', newUploadPath);
+
+        expect(response.status).toBe(200);
+        expect(response.body.success).toBe(true);
+
+        updatedImage = await Image.findById(image._id);
+        expect(updatedImage.title).toBe('Updated Title');
+        expect(updatedImage.status).toBe(false);
+        expect(updatedImage.filePath).not.toBe(oldFilePath);
+        expect(updatedImage.width).toBe(640);
+        expect(updatedImage.height).toBe(480);
+        expect(fs.existsSync(oldFilePath)).toBe(false);
+      } finally {
+        imageService.getImageMetadata = originalGetImageMetadata;
+
+        if (fs.existsSync(newUploadPath)) {
+          fs.unlinkSync(newUploadPath);
+        }
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+        }
+        if (updatedImage?.filePath && fs.existsSync(updatedImage.filePath)) {
+          fs.unlinkSync(updatedImage.filePath);
+        }
+      }
+    });
+  });
+
+  describe('DELETE /api/images/:id', () => {
+    it('should delete image and remove file', async () => {
+      const uploadsDir = path.join(process.cwd(), config.uploadPath);
+      const filePath = path.join(uploadsDir, `delete-file-${Date.now()}.jpg`);
+      fs.writeFileSync(filePath, 'delete-me');
+
+      const image = await Image.create({
+        title: 'Delete Me',
+        description: 'To be removed',
+        filePath,
+        fileName: path.basename(filePath),
+        mimeType: 'image/jpeg',
+        size: 200,
+        width: 20,
+        height: 20,
+        categoryIds: [],
+        status: true,
+        countUsage: 0,
+        countFavorite: 0
+      });
+
+      let response;
+      try {
+        response = await request(app)
+          .delete(`/api/images/${image._id}`)
+          .set('Authorization', `Bearer ${adminToken}`);
+      } finally {
+        if (response?.status !== 200 && fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+
+      const deletedImage = await Image.findById(image._id);
+      expect(deletedImage).toBeNull();
+      expect(fs.existsSync(filePath)).toBe(false);
     });
   });
 });

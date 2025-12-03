@@ -337,7 +337,7 @@ const editCategory = asyncHandler(async (req, res) => {
 });
 
 /**
- * Soft delete category
+ * Permanently delete category
  */
 const deleteCategory = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -358,13 +358,18 @@ const deleteCategory = asyncHandler(async (req, res) => {
     await imageService.deleteImageFile(category.thumbnail);
   }
 
-  // Soft delete
-  category.status = false;
-  await category.save();
+  // Remove category reference from images to keep data consistent
+  const imageUpdateResult = await Image.updateMany(
+    { categoryIds: id },
+    { $pull: { categoryIds: id } }
+  );
 
-  logger.info('Category soft deleted', {
+  await category.deleteOne();
+
+  logger.info('Category permanently deleted', {
     categoryId: id,
     title: category.title,
+    imagesUpdated: imageUpdateResult.modifiedCount,
     userId: req.user?.userId
   });
 

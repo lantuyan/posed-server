@@ -116,6 +116,13 @@ const validateImageMetadata = [
   
   body('categoryIds')
     .optional()
+    .customSanitizer((value) => {
+      // Allow single string value by converting to array for consistent handling
+      if (typeof value === 'string') {
+        return [value];
+      }
+      return value;
+    })
     .isArray()
     .withMessage('CategoryIds must be an array'),
   
@@ -276,4 +283,3 @@ module.exports = {
   validateSubmissionList,
   validateSubmissionUpdate
 };
-

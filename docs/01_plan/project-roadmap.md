@@ -23,7 +23,7 @@ Backend API hoàn chỉnh
 
 Auth admin/editor bằng JWT; public dùng STATIC_USER_TOKEN cho đọc & increment counters.
 
-CRUD categories, CRUD images, upload ảnh (multipart), pagination & search, soft delete, index tối ưu.
+CRUD categories, CRUD images, upload ảnh (multipart), pagination & search, hard delete (xoá file + record), index tối ưu.
 
 Public Increment API: $inc atomic, rate limiting, logging audit.
 
@@ -60,7 +60,7 @@ Middleware: verifyAdminOrEditor kiểm JWT & role; verifyStaticUser kiểm STATI
 
 Categories
 
-POST /api/categories (admin/editor), GET /api/categories (public), GET /api/categories/:id trả kèm mảng images với tuỳ chọn phân trang; PUT, DELETE (soft delete).
+POST /api/categories (admin/editor), GET /api/categories (public), GET /api/categories/:id trả kèm mảng images với tuỳ chọn phân trang; PUT, DELETE (hard delete + dọn file).
 
 Nếu ảnh quá nhiều vượt ngưỡng, bắt buộc client dùng phân trang / trả về lỗi hướng dẫn phân trang.
 
@@ -70,7 +70,7 @@ POST /api/images upload một/nhiều ảnh (multer), lưu filesystem + metadata
 
 GET /api/images có lọc, search, sort, pagination; GET /api/images/:id (tùy config có thể auto $inc usage).
 
-PUT /api/images/:id update metadata; DELETE soft delete.
+PUT /api/images/:id update metadata/replace file; DELETE hard delete (xoá file).
 
 Public Increment
 
@@ -82,7 +82,7 @@ Kiến trúc thư mục, config, models, middleware, services, routing theo hư�
 
 Auth UI: trang Login, lưu JWT (storage an toàn), guard routes.
 
-Categories UI: table (paging/sort/search), form create/update, soft delete.
+Categories UI: table (paging/sort/search), form create/update, hard delete.
 
 Images UI: upload (multi), preview, edit metadata, gán categories, list/pagination/search.
 
@@ -135,7 +135,7 @@ Thời gian: 2025-10-05 → 2025-10-04 (Hoàn thành sớm)
 
 Mục tiêu: CRUD categories & images, upload ảnh (multer), metadata, pagination/search, index DB, logging.
 
-Kết quả: ✅ API ổn định, response pagination chuẩn, upload nhiều file hoạt động, validate categories, soft delete. Tất cả tests pass (31/31), public increment API hoạt động.
+Kết quả: ✅ API ổn định, response pagination chuẩn, upload nhiều file hoạt động, validate categories, hard delete. Tất cả tests pass (31/31), public increment API hoạt động.
 
 Sprint 3 — Public Increment & Dashboard (Auth + CRUD + Analytics cơ bản)
 

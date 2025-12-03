@@ -173,7 +173,7 @@ Hỗ trợ imagesSearch: nếu được cung cấp, filter thêm điều kiện 
 
 updateCategory: cập nhật title/description/status
 
-deleteCategory: set status = false (soft delete)
+deleteCategory: xoá vĩnh viễn category (kèm icon/thumbnail) và gỡ id khỏi mảng categoryIds của Image để tránh tham chiếu mồ côi
 
 ImageController
 
@@ -219,11 +219,11 @@ Trả document image
 
 updateImageMetadata:
 
-Chỉ cập nhật các trường như title, description, status, categoryIds (với validation)
+Cập nhật title/description/status/categoryIds (có validate) và cho phép upload file mới để thay thế ảnh cũ (đọc lại metadata, xoá file cũ).
 
 deleteImage:
 
-Soft delete: set status = false
+Xoá vĩnh viễn: xoá file trên đĩa (nếu có) và xoá record khỏi DB
 
 PublicController (increment API)
 

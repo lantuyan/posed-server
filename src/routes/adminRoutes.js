@@ -18,6 +18,7 @@ const {
 const {
   uploadCategoryFiles,
   uploadMultiple,
+  uploadSingle,
   handleUploadError
 } = require('../middlewares/upload');
 const userSubmissionAdminController = require('../controllers/userSubmissionAdminController');
@@ -410,7 +411,7 @@ router.post('/images',
  * /api/admin/images/{id}:
  *   put:
  *     summary: Update image metadata (admin)
- *     description: Update metadata for a single image.
+ *     description: Update metadata for a single image and optionally replace the stored file.
  *     tags: [Admin - Images]
  *     security:
  *       - BearerAuth: []
@@ -426,6 +427,24 @@ router.post('/images',
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/ImageMetadataRequest'
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               status:
+ *                 type: boolean
+ *               categoryIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: Optional new image file to replace existing
  *     responses:
  *       200:
  *         description: Image updated successfully
@@ -439,6 +458,8 @@ router.post('/images',
 router.put('/images/:id',
   verifyAdminOrEditor,
   validateObjectId,
+  uploadSingle,
+  handleUploadError,
   validateImageMetadata,
   imageController.updateImage
 );
@@ -448,7 +469,7 @@ router.put('/images/:id',
  * /api/admin/images/{id}:
  *   delete:
  *     summary: Delete image (admin)
- *     description: Soft delete an image record.
+ *     description: Permanently delete an image record and its stored file.
  *     tags: [Admin - Images]
  *     security:
  *       - BearerAuth: []
@@ -638,4 +659,3 @@ router.put('/user-submissions/:id',
 );
 
 module.exports = router;
-
