@@ -100,6 +100,11 @@ const options = {
               type: 'boolean',
               example: true
             },
+            priority: {
+              type: 'integer',
+              example: 1,
+              description: 'Lower number means higher priority. Each value can only be used once.'
+            },
             createdAt: {
               type: 'string',
               format: 'date-time'
@@ -347,6 +352,11 @@ const options = {
             description: {
               type: 'string',
               example: 'Beautiful nature images'
+            },
+            newId: {
+              type: 'string',
+              description: 'Optional new MongoDB ObjectId to replace the current category id',
+              example: '507f1f77bcf86cd799439012'
             }
           }
         },

@@ -70,6 +70,17 @@ const validateCategory = [
     .optional()
     .isBoolean()
     .withMessage('Status must be a boolean value'),
+
+  body('priority')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Priority must be a positive integer')
+    .toInt(),
+
+  body('newId')
+    .optional()
+    .isMongoId()
+    .withMessage('newId must be a valid MongoDB ObjectId'),
   
   handleValidationErrors
 ];
@@ -94,6 +105,17 @@ const validateCategoryEdit = [
     .optional()
     .isBoolean()
     .withMessage('Status must be a boolean value'),
+
+  body('priority')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Priority must be a positive integer')
+    .toInt(),
+
+  body('newId')
+    .optional()
+    .isMongoId()
+    .withMessage('newId must be a valid MongoDB ObjectId'),
   
   handleValidationErrors
 ];
