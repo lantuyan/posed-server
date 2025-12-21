@@ -142,6 +142,16 @@ log_info "Đã set USE_HTTPS=true trong .env"
 # 5. Reconfigure Nginx (Quan trọng!)
 log_info "5. Cấu hình lại Nginx..."
 
+# Get PORT from .env
+APP_PORT=3000
+if [ -f .env ]; then
+    ENV_PORT=$(grep -E "^PORT=" .env 2>/dev/null | cut -d '=' -f2- | tr -d '"' | tr -d "'" | xargs || echo "")
+    if [ -n "$ENV_PORT" ]; then
+        APP_PORT=$ENV_PORT
+    fi
+fi
+log_info "App running on port: $APP_PORT"
+
 if command -v nginx &> /dev/null; then
     NGINX_CONFIG="/etc/nginx/sites-available/posed-server"
     
@@ -206,7 +216,7 @@ server {
 
     # Proxy to Node.js app
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:$APP_PORT;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
