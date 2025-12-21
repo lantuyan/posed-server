@@ -43,13 +43,17 @@ log_info "Local Backup Dir: $LOCAL_BACKUP_DIR"
 log_info "Connecting to remote server to trigger backup..."
 # We run the backup script and capture the output to find the filename
 # We use 'bash -l' to ensure environment variables are loaded if needed
-BACKUP_OUTPUT=$(ssh "$REMOTE_HOST" "cd $REMOTE_PATH && bash -l scripts/backup.sh")
+# Create temp file to capture output
+OUTPUT_FILE=$(mktemp)
 
-echo "$BACKUP_OUTPUT"
+# Run ssh and tee output so user sees progress in real-time
+ssh "$REMOTE_HOST" "cd $REMOTE_PATH && bash -l scripts/backup.sh" | tee "$OUTPUT_FILE"
 
 # Extract the backup file path from the output
 # Looking for line: "Backup file: backups/backup_YYYYMMDD_HHMMSS.tar.gz"
-REMOTE_BACKUP_FILE=$(echo "$BACKUP_OUTPUT" | grep "Backup file:" | awk '{print $NF}' | tr -d '\r')
+REMOTE_BACKUP_FILE=$(grep "Backup file:" "$OUTPUT_FILE" | awk '{print $NF}' | tr -d '\r')
+
+rm "$OUTPUT_FILE"
 
 if [ -z "$REMOTE_BACKUP_FILE" ]; then
     log_error "Could not determine backup filename from remote output."
@@ -64,13 +68,22 @@ log_info "Downloading backup file..."
 FULL_REMOTE_PATH="$REMOTE_PATH/$REMOTE_BACKUP_FILE"
 FILENAME=$(basename "$REMOTE_BACKUP_FILE")
 
-scp "$REMOTE_HOST:$FULL_REMOTE_PATH" "$LOCAL_BACKUP_DIR/$FILENAME"
+# Check file size
+FILE_SIZE=$(ssh "$REMOTE_HOST" "du -h $FULL_REMOTE_PATH | cut -f1")
+log_info "Remote file size: $FILE_SIZE"
+
+if command -v rsync &> /dev/null; then
+    log_info "Using rsync for download (resumable)..."
+    rsync -avP -e ssh "$REMOTE_HOST:$FULL_REMOTE_PATH" "$LOCAL_BACKUP_DIR/$FILENAME"
+else
+    log_info "rsync not found, using scp..."
+    scp "$REMOTE_HOST:$FULL_REMOTE_PATH" "$LOCAL_BACKUP_DIR/$FILENAME"
+fi
 
 if [ $? -eq 0 ]; then
     log_success "Backup downloaded successfully to: $LOCAL_BACKUP_DIR/$FILENAME"
     
-    # 3. Clean up remote file (Optional - ask user or just do it? Plan said optional. Let's keep it but maybe prompt or just do it to save space)
-    # For automation, it's better to just do it or have a flag. Let's just do it to keep server clean.
+    # 3. Clean up remote file
     log_info "Cleaning up remote backup file..."
     ssh "$REMOTE_HOST" "rm -f $FULL_REMOTE_PATH"
     log_success "Remote backup file removed."
