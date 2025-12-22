@@ -12,7 +12,7 @@ const { getImageUrl } = require('../utils/urlHelper');
  */
 const uploadImages = asyncHandler(async (req, res) => {
   const files = req.files;
-  const { title, description, categoryIds } = req.body;
+  const { title, description, categoryIds, from } = req.body;
 
   if (!files || files.length === 0) {
     return res.status(400).json({
@@ -49,6 +49,7 @@ const uploadImages = asyncHandler(async (req, res) => {
       const image = new Image({
         title: title || file.originalname,
         description: description || '',
+        from,
         filePath: file.path,
         fileName: file.filename,
         mimeType: file.mimetype,
@@ -123,6 +124,7 @@ const getImages = asyncHandler(async (req, res) => {
   const categoryId = req.query.categoryId;
   const status = req.query.status !== undefined ? req.query.status === 'true' : true;
   const sort = req.query.sort || 'createdAt:desc';
+  const from = req.query.from;
 
   // Build query
   const query = { status };
@@ -142,7 +144,12 @@ const getImages = asyncHandler(async (req, res) => {
   const sortParts = sort.split(':');
   const sortField = sortParts[0];
   const sortOrder = sortParts[1] === 'asc' ? 1 : -1;
-  const sortObj = { [sortField]: sortOrder };
+  let sortObj = { [sortField]: sortOrder };
+  if (from) {
+    sortObj = sortField === 'from'
+      ? { from: -1 }
+      : { from: -1, [sortField]: sortOrder };
+  }
 
   // Calculate pagination
   const skip = (page - 1) * limit;
@@ -258,7 +265,7 @@ const getImageById = asyncHandler(async (req, res) => {
  */
 const updateImage = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { title, description, categoryIds, status } = req.body;
+  const { title, description, categoryIds, status, from } = req.body;
   const uploadedFile = req.file;
 
   const image = await Image.findById(id);
@@ -323,6 +330,7 @@ const updateImage = asyncHandler(async (req, res) => {
   if (title !== undefined) image.title = title;
   if (description !== undefined) image.description = description;
   if (status !== undefined) image.status = status;
+  if (from !== undefined) image.from = from;
 
   await image.save();
 

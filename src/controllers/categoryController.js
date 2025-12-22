@@ -181,6 +181,7 @@ const getCategoryById = asyncHandler(async (req, res) => {
   const imagesPage = parseInt(req.query.imagesPage) || 1;
   const imagesLimit = parseInt(req.query.imagesLimit) || config.defaultImagesLimit;
   const imagesSearch = req.query.imagesSearch;
+  const imagesFrom = req.query.from;
 
   // Get category
   const category = await Category.findById(id);
@@ -211,16 +212,18 @@ const getCategoryById = asyncHandler(async (req, res) => {
   let imagesPagination = null;
 
   // Check threshold
+  const imagesSort = imagesFrom ? { from: -1, createdAt: -1 } : { createdAt: -1 };
+
   if (totalImages <= config.imagesArrayMaxDefault) {
     // Return all images if under threshold
     images = await Image.find(imagesQuery)
-      .sort({ createdAt: -1 })
+      .sort(imagesSort)
       .select('title description fileName filePath mimeType size width height countUsage countFavorite status createdAt');
   } else {
     // Use pagination if over threshold
     const skip = (imagesPage - 1) * imagesLimit;
     images = await Image.find(imagesQuery)
-      .sort({ createdAt: -1 })
+      .sort(imagesSort)
       .skip(skip)
       .limit(imagesLimit)
       .select('title description fileName filePath mimeType size width height countUsage countFavorite status createdAt');

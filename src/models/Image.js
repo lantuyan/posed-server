@@ -11,6 +11,10 @@ const ImageSchema = new mongoose.Schema({
     trim: true,
     maxlength: 1000
   },
+  from: {
+    type: String,
+    trim: true
+  },
   filePath: { 
     type: String, 
     required: true 
@@ -67,4 +71,3 @@ ImageSchema.index({ countUsage: -1 });
 ImageSchema.index({ countFavorite: -1 });
 
 module.exports = mongoose.model('Image', ImageSchema);
-
