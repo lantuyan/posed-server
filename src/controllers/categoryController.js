@@ -212,7 +212,7 @@ const getCategoryById = asyncHandler(async (req, res) => {
   let imagesPagination = null;
 
   // Check threshold
-  const imagesSort = imagesFrom ? { from: -1, createdAt: -1 } : { createdAt: -1 };
+  const imagesSort = imagesFrom ? { from: -1, createdAt: -1 } : { from: 1, createdAt: -1 };
 
   if (totalImages <= config.imagesArrayMaxDefault) {
     // Return all images if under threshold

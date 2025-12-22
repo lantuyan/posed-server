@@ -149,6 +149,8 @@ const getImages = asyncHandler(async (req, res) => {
     sortObj = sortField === 'from'
       ? { from: -1 }
       : { from: -1, [sortField]: sortOrder };
+  } else if (sortField !== 'from') {
+    sortObj = { from: 1, [sortField]: sortOrder };
   }
 
   // Calculate pagination
