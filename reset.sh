@@ -27,6 +27,7 @@ echo -e "${GREEN}"
 echo "╔══════════════════════════════════════════════════════╗"
 echo "║             Pose Server - Reset Script              ║"
 echo "║     Xóa database và restart server bằng 1 lệnh     ║"
+echo "║  Chỉ dành cho pose.sixpilot.technology             ║"
 echo "╚══════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 

@@ -530,10 +530,13 @@ else
 fi
 
 # Cấu hình Nginx reverse proxy
+# LƯU Ý: Chỉ cấu hình cho pose.sixpilot.technology
+# Landing page (sixpilot.technology) được cấu hình riêng trong dự án sixpilot-technology
 NGINX_CONFIG="/etc/nginx/sites-available/posed-server"
 NGINX_ENABLED="/etc/nginx/sites-enabled/posed-server"
 
 log_info "Đang cấu hình Nginx reverse proxy cho domain: $DOMAIN"
+log_info "LƯU Ý: Chỉ cấu hình cho pose.sixpilot.technology, không ảnh hưởng đến sixpilot.technology"
 
 # Tạo cấu hình Nginx
 if [ -f "$CERT_PATH" ] && [ -f "$KEY_PATH" ]; then
@@ -649,16 +652,19 @@ server {
 EOF
 fi
 
-# Xóa default site nếu có và enable site mới
+# Xóa default site nếu có (chỉ xóa default, không xóa config của landing page)
 if [ -L /etc/nginx/sites-enabled/default ]; then
     log_info "Đang xóa default site..."
     $SUDO_PREFIX rm -f /etc/nginx/sites-enabled/default
 fi
 
-# Enable site
+# Enable site (chỉ enable posed-server, không ảnh hưởng đến sixpilot.technology)
 if [ ! -L "$NGINX_ENABLED" ]; then
     $SUDO_PREFIX ln -s "$NGINX_CONFIG" "$NGINX_ENABLED"
-    log_success "Đã enable Nginx site"
+    log_success "Đã enable Nginx site cho posed-server"
+    log_info "Config landing page (sixpilot.technology) không bị ảnh hưởng"
+else
+    log_info "Nginx site cho posed-server đã được enable"
 fi
 
 # Test Nginx configuration

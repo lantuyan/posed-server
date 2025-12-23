@@ -17,7 +17,6 @@ const adminRoutes = require('./routes/adminRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
 const imageRoutes = require('./routes/imageRoutes');
 const publicRoutes = require('./routes/publicRoutes');
-const staticRoutes = require('./routes/staticRoutes');
 
 const app = express();
 
@@ -128,10 +127,6 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3001',
   credentials: true
 }));
-
-// Public static pages (no auth required)
-// NOTE: Mounted before rate limiting to keep these endpoints always accessible.
-app.use(staticRoutes);
 
 // Rate limiting - Configurable via .env
 if (config.rateLimit.enabled) {

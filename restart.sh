@@ -26,6 +26,7 @@ echo "╔═══════════════════════�
 echo "║          Pose Server - Restart Script               ║"
 echo "║         Restart server đang chạy trên PM2          ║"
 echo "║    Xử lý port bị chiếm và process duplicate        ║"
+echo "║  Chỉ dành cho pose.sixpilot.technology             ║"
 echo "╚══════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
