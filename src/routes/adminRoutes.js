@@ -99,7 +99,8 @@ router.post('/login', loginLimiter, validateLogin, authController.login);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/test-admin', verifyAdminOrEditor, authController.testAdminAuth);
+// DISABLED: Test admin endpoint
+// router.get('/test-admin', verifyAdminOrEditor, authController.testAdminAuth);
 
 /**
  * @swagger
@@ -131,7 +132,8 @@ router.get('/test-admin', verifyAdminOrEditor, authController.testAdminAuth);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get('/test-public', verifyStaticUser, authController.testStaticAuth);
+// DISABLED: Test public endpoint
+// router.get('/test-public', verifyStaticUser, authController.testStaticAuth);
 
 /**
  * @swagger

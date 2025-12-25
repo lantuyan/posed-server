@@ -41,48 +41,49 @@ app.use((req, res, next) => {
 // - Client app nên HARDCODE pin hash trong app, không nên fetch từ server
 // - Endpoint này chỉ để reference/documentation, không nên dùng trong production
 
+// DISABLED: SSL pinning info endpoint
 // Endpoint để lấy pin hash (optional - chỉ để reference)
 // LƯU Ý: Nếu client app hardcode pin hash, endpoint này không cần thiết
-app.get('/api/ssl-pin-info', (req, res) => {
-  const sslPinHash = process.env.SSL_PIN_HASH;
-  const useHttps = process.env.USE_HTTPS === 'true';
-  
-  if (useHttps && sslPinHash) {
-    res.json({
-      success: true,
-      pinHash: sslPinHash,
-      algorithm: 'sha256',
-      format: 'base64',
-      note: '⚠️ LƯU Ý: Nên hardcode pin hash trong client app, không nên fetch từ server',
-      recommendation: 'Copy pin hash từ certs/pin-hash.txt và hardcode trong mobile app'
-    });
-  } else {
-    // Nếu không có trong .env, thử đọc từ file
-    const fs = require('fs');
-    const path = require('path');
-    const pinHashFile = path.join(process.cwd(), 'certs', 'pin-hash.txt');
-    
-    if (fs.existsSync(pinHashFile)) {
-      const pinHash = fs.readFileSync(pinHashFile, 'utf8').trim();
-      res.json({
-        success: true,
-        pinHash: pinHash,
-        algorithm: 'sha256',
-        format: 'base64',
-        source: 'certs/pin-hash.txt',
-        note: '⚠️ LƯU Ý: Nên hardcode pin hash trong client app, không nên fetch từ server',
-        recommendation: 'Copy pin hash trên và hardcode trong mobile app'
-      });
-    } else {
-      res.status(503).json({
-        success: false,
-        error: 'SSL pinning not configured',
-        note: 'Chạy: npm run extract-pin [certificate-path] để extract pin hash',
-        recommendation: 'Pin hash sẽ được lưu vào certs/pin-hash.txt để copy vào client app'
-      });
-    }
-  }
-});
+// app.get('/api/ssl-pin-info', (req, res) => {
+//   const sslPinHash = process.env.SSL_PIN_HASH;
+//   const useHttps = process.env.USE_HTTPS === 'true';
+//   
+//   if (useHttps && sslPinHash) {
+//     res.json({
+//       success: true,
+//       pinHash: sslPinHash,
+//       algorithm: 'sha256',
+//       format: 'base64',
+//       note: '⚠️ LƯU Ý: Nên hardcode pin hash trong client app, không nên fetch từ server',
+//       recommendation: 'Copy pin hash từ certs/pin-hash.txt và hardcode trong mobile app'
+//     });
+//   } else {
+//     // Nếu không có trong .env, thử đọc từ file
+//     const fs = require('fs');
+//     const path = require('path');
+//     const pinHashFile = path.join(process.cwd(), 'certs', 'pin-hash.txt');
+//     
+//     if (fs.existsSync(pinHashFile)) {
+//       const pinHash = fs.readFileSync(pinHashFile, 'utf8').trim();
+//       res.json({
+//         success: true,
+//         pinHash: pinHash,
+//         algorithm: 'sha256',
+//         format: 'base64',
+//         source: 'certs/pin-hash.txt',
+//         note: '⚠️ LƯU Ý: Nên hardcode pin hash trong client app, không nên fetch từ server',
+//         recommendation: 'Copy pin hash trên và hardcode trong mobile app'
+//       });
+//     } else {
+//       res.status(503).json({
+//         success: false,
+//         error: 'SSL pinning not configured',
+//         note: 'Chạy: npm run extract-pin [certificate-path] để extract pin hash',
+//         recommendation: 'Pin hash sẽ được lưu vào certs/pin-hash.txt để copy vào client app'
+//       });
+//     }
+//   }
+// });
 
 // Anti-MITM Detection Middleware
 // Phát hiện các dấu hiệu của MITM proxy (như Proxyman)
