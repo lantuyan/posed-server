@@ -123,8 +123,37 @@ const getImages = asyncHandler(async (req, res) => {
   const search = req.query.search;
   const categoryId = req.query.categoryId;
   const status = req.query.status !== undefined ? req.query.status === 'true' : true;
-  const sort = req.query.sort || 'createdAt:desc';
   const from = req.query.from;
+
+  // Allowed sort fields
+  const allowedSortFields = ['createdAt', 'countUsage', 'countFavorite', 'title', 'from'];
+  
+  // Parse sort parameter - support both formats:
+  // 1. sort=field:order (backward compatible)
+  // 2. sortBy=field&sortOrder=order (Swagger format)
+  let sortField = 'createdAt';
+  let sortOrder = -1; // desc by default
+  
+  if (req.query.sortBy || req.query.sortOrder) {
+    // New format: sortBy and sortOrder
+    sortField = req.query.sortBy || 'createdAt';
+    const order = req.query.sortOrder || 'desc';
+    sortOrder = order === 'asc' ? 1 : -1;
+  } else if (req.query.sort) {
+    // Old format: sort=field:order
+    const sortParts = req.query.sort.split(':');
+    sortField = sortParts[0] || 'createdAt';
+    const order = sortParts[1] || 'desc';
+    sortOrder = order === 'asc' ? 1 : -1;
+  }
+
+  // Validate sort field
+  if (!allowedSortFields.includes(sortField)) {
+    return res.status(400).json({
+      success: false,
+      error: `Invalid sort field. Allowed fields: ${allowedSortFields.join(', ')}`
+    });
+  }
 
   // Build query
   const query = { status };
@@ -141,9 +170,6 @@ const getImages = asyncHandler(async (req, res) => {
   }
 
   // Build sort object
-  const sortParts = sort.split(':');
-  const sortField = sortParts[0];
-  const sortOrder = sortParts[1] === 'asc' ? 1 : -1;
   let sortObj = { [sortField]: sortOrder };
   if (from) {
     sortObj = sortField === 'from'
@@ -172,6 +198,8 @@ const getImages = asyncHandler(async (req, res) => {
     limit,
     search,
     categoryId,
+    sortField,
+    sortOrder: sortOrder === 1 ? 'asc' : 'desc',
     userId: req.user?.userId
   });
 
