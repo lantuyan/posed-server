@@ -10,6 +10,8 @@ const config = require('./config');
 const logger = require('./utils/logger');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
 const { apiLimiter } = require('./middlewares/rateLimiter');
+const { createImageCacheMiddleware } = require('./middlewares/imageCache');
+const imageCacheService = require('./services/imageCacheService');
 const swaggerSpecs = require('./config/swagger');
 
 // Import routes
@@ -161,7 +163,16 @@ if (!fs.existsSync(userUploadsDir)) {
 logger.info(`Serving static files from: ${uploadsDir}`);
 logger.info(`Static files accessible at: /uploads/*`);
 
-// Serve static files from uploads directory (must be before other routes)
+// Image cache middleware - intercepts image requests before express.static
+if (config.imageCache.enabled) {
+  app.use('/uploads', createImageCacheMiddleware(uploadsDir));
+  logger.info('Image caching enabled', {
+    ttlSeconds: config.imageCache.ttlSeconds,
+    maxSizeMB: config.imageCache.maxSizeBytes / (1024 * 1024)
+  });
+}
+
+// Serve static files from uploads directory (fallback for non-cached files)
 app.use('/uploads', express.static(uploadsDir, {
   index: false,
   dotfiles: 'ignore',
@@ -169,27 +180,10 @@ app.use('/uploads', express.static(uploadsDir, {
     // Ensure browsers permit cross-origin image loads (avoid CORP/CORS blocks)
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Access-Control-Allow-Origin', '*');
+    // Add cache headers for browser caching
+    res.setHeader('Cache-Control', `public, max-age=${config.imageCache.httpMaxAgeSeconds || 86400}`);
   }
 }));
-
-// Alternative route for serving images (fallback)
-app.get('/uploads/images/:filename', (req, res) => {
-  const filename = req.params.filename;
-  const filePath = path.join(uploadsDir, filename);
-  
-  logger.info(`Serving image: ${filename} from ${filePath}`);
-  
-  // Check if file exists
-  if (fs.existsSync(filePath)) {
-    res.sendFile(filePath);
-  } else {
-    logger.warn(`Image not found: ${filePath}`);
-    res.status(404).json({
-      success: false,
-      error: 'Image not found'
-    });
-  }
-});
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -261,12 +255,14 @@ const connectDB = async () => {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
+  imageCacheService.flush();
   await mongoose.connection.close();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
+  imageCacheService.flush();
   await mongoose.connection.close();
   process.exit(0);
 });

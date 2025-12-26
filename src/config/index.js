@@ -67,6 +67,43 @@ module.exports = {
   baseUrl: process.env.BASE_URL || `http://localhost:${process.env.PORT || 3000}`,
   
   // Image Configuration
-  autoIncrementUsageOnView: process.env.AUTO_INCREMENT_USAGE_ON_VIEW === 'true'
+  autoIncrementUsageOnView: process.env.AUTO_INCREMENT_USAGE_ON_VIEW === 'true',
+
+  // Image Cache Configuration
+  imageCache: {
+    enabled: process.env.IMAGE_CACHE_ENABLED === 'true', // Default: disabled
+
+    // TTL in seconds (default: 1 hour)
+    ttlSeconds: (() => {
+      const val = parseInt(process.env.IMAGE_CACHE_TTL_SECONDS || '3600');
+      if (isNaN(val) || val < 0) {
+        console.warn('Invalid IMAGE_CACHE_TTL_SECONDS: using default 3600 (1 hour)');
+        return 3600;
+      }
+      return val;
+    })(),
+
+    // Check period for expired keys in seconds (default: 10 minutes)
+    checkPeriodSeconds: parseInt(process.env.IMAGE_CACHE_CHECK_PERIOD || '600'),
+
+    // Max cache size in bytes (default: 100MB)
+    maxSizeBytes: (() => {
+      const val = parseInt(process.env.IMAGE_CACHE_MAX_SIZE_BYTES || '104857600');
+      if (isNaN(val) || val < 0) {
+        console.warn('Invalid IMAGE_CACHE_MAX_SIZE_BYTES: using default 100MB');
+        return 104857600;
+      }
+      return val;
+    })(),
+
+    // Max individual image size to cache (default: 5MB, skip larger images)
+    maxFileSizeBytes: parseInt(process.env.IMAGE_CACHE_MAX_FILE_SIZE || '5242880'),
+
+    // HTTP Cache-Control max-age in seconds (default: 1 day for browsers)
+    httpMaxAgeSeconds: parseInt(process.env.IMAGE_HTTP_MAX_AGE_SECONDS || '86400'),
+
+    // Use ETag for conditional requests
+    useEtag: process.env.IMAGE_CACHE_USE_ETAG !== 'false' // Default: enabled
+  }
 };
 

@@ -2,6 +2,7 @@ const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 const logger = require('../utils/logger');
+const imageCacheService = require('./imageCacheService');
 
 class ImageService {
   /**
@@ -59,6 +60,10 @@ class ImageService {
   async deleteImageFile(filePath) {
     try {
       if (fs.existsSync(filePath)) {
+        // Invalidate cache before deleting file
+        const filename = path.basename(filePath);
+        imageCacheService.invalidate(filename);
+
         fs.unlinkSync(filePath);
         logger.info('Image file deleted', { filePath });
         return true;
