@@ -123,8 +123,28 @@ const getImages = asyncHandler(async (req, res) => {
   const search = req.query.search;
   const categoryId = req.query.categoryId;
   const status = req.query.status !== undefined ? req.query.status === 'true' : true;
-  const sort = req.query.sort || 'createdAt:desc';
   const from = req.query.from;
+
+  // Support both new format (sortBy/sortOrder) and legacy format (sort)
+  let sortField = 'createdAt';
+  let sortOrder = -1; // desc by default
+  
+  if (req.query.sortBy) {
+    // New format: separate sortBy and sortOrder parameters
+    sortField = req.query.sortBy;
+    sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
+  } else if (req.query.sort) {
+    // Legacy format: sort=field:order
+    const sortParts = req.query.sort.split(':');
+    sortField = sortParts[0] || 'createdAt';
+    sortOrder = sortParts[1] === 'asc' ? 1 : -1;
+  }
+
+  // Validate sort field - only allow valid fields
+  const validSortFields = ['createdAt', 'countUsage', 'countFavorite', 'title', 'updatedAt'];
+  if (!validSortFields.includes(sortField)) {
+    sortField = 'createdAt';
+  }
 
   // Build query
   const query = { status };
@@ -141,16 +161,15 @@ const getImages = asyncHandler(async (req, res) => {
   }
 
   // Build sort object
-  const sortParts = sort.split(':');
-  const sortField = sortParts[0];
-  const sortOrder = sortParts[1] === 'asc' ? 1 : -1;
-  let sortObj = { [sortField]: sortOrder };
+  // If filtering by 'from', prioritize it in sorting
+  let sortObj = {};
   if (from) {
-    sortObj = sortField === 'from'
-      ? { from: -1 }
-      : { from: -1, [sortField]: sortOrder };
-  } else if (sortField !== 'from') {
-    sortObj = { from: 1, [sortField]: sortOrder };
+    sortObj.from = -1;
+    if (sortField !== 'from') {
+      sortObj[sortField] = sortOrder;
+    }
+  } else {
+    sortObj[sortField] = sortOrder;
   }
 
   // Calculate pagination
