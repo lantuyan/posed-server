@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * Script to clear all images from the database
- * Usage: node scripts/clear-images.js [--dry-run] [--with-files]
- * 
+ * Script to clear all images from the database and file system
+ * Usage: node scripts/clear-images.js [--dry-run] [--db-only]
+ *
  * Options:
- *   --dry-run     Show what would be deleted without actually deleting
- *   --with-files  Also delete image files from the uploads directory
+ *   --dry-run   Show what would be deleted without actually deleting
+ *   --db-only   Only delete from database, keep files on disk
  */
 
 require('dotenv').config();
@@ -23,7 +23,8 @@ const UPLOAD_PATH = process.env.UPLOAD_PATH || 'uploads/images';
 
 const args = process.argv.slice(2);
 const isDryRun = args.includes('--dry-run');
-const withFiles = args.includes('--with-files');
+const dbOnly = args.includes('--db-only');
+const deleteFiles = !dbOnly; // Default: delete files too
 
 async function askConfirmation(question) {
     const rl = readline.createInterface({
@@ -57,10 +58,12 @@ async function clearImages() {
             return;
         }
 
-        if (withFiles) {
+        if (deleteFiles) {
             // Get all file paths
             const images = await Image.find({}, 'filePath fileName');
             console.log(`📁 Will also delete ${images.length} image files from: ${UPLOAD_PATH}`);
+        } else {
+            console.log('📁 DB-only mode: Files will NOT be deleted from disk');
         }
 
         if (isDryRun) {
@@ -92,8 +95,8 @@ async function clearImages() {
             return;
         }
 
-        // Delete image files if requested
-        if (withFiles) {
+        // Delete image files (default behavior)
+        if (deleteFiles) {
             console.log('\n🗑️  Deleting image files...');
             const images = await Image.find({}, 'filePath');
             let deletedFiles = 0;
