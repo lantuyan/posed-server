@@ -25,8 +25,10 @@ const createImageCacheMiddleware = (uploadsBasePath) => {
 
     try {
       // Construct full file path
-      const relativePath = req.path.startsWith('/') ? req.path.slice(1) : req.path;
-      const filePath = path.join(uploadsBasePath, relativePath);
+      // Note: uploadsBasePath is already the full path to the images directory (e.g., /root/posed-server/uploads/images)
+      // and req.path is like /images/filename.png when mounted at /uploads
+      // So we only need the filename to avoid double /images/images/ path
+      const filePath = path.join(uploadsBasePath, filename);
 
       // Try to get from cache or load
       const imageData = await imageCacheService.get(filename, filePath);
