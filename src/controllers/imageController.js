@@ -127,13 +127,13 @@ const getImages = asyncHandler(async (req, res) => {
 
   // Allowed sort fields
   const allowedSortFields = ['createdAt', 'countUsage', 'countFavorite', 'title', 'from'];
-  
+
   // Parse sort parameter - support both formats:
   // 1. sort=field:order (backward compatible)
   // 2. sortBy=field&sortOrder=order (Swagger format)
   let sortField = 'createdAt';
   let sortOrder = -1; // desc by default
-  
+
   if (req.query.sortBy || req.query.sortOrder) {
     // New format: sortBy and sortOrder
     sortField = req.query.sortBy || 'createdAt';
@@ -157,7 +157,7 @@ const getImages = asyncHandler(async (req, res) => {
 
   // Build query
   const query = { status };
-  
+
   if (search) {
     query.$or = [
       { title: { $regex: search, $options: 'i' } },
@@ -170,13 +170,15 @@ const getImages = asyncHandler(async (req, res) => {
   }
 
   // Build sort object
-  let sortObj = { [sortField]: sortOrder };
+  // Always include _id as secondary sort to ensure deterministic ordering
+  // This prevents duplicate items appearing across pages when sorting by non-unique fields
+  let sortObj = { [sortField]: sortOrder, _id: sortOrder };
   if (from) {
     sortObj = sortField === 'from'
-      ? { from: -1 }
-      : { from: -1, [sortField]: sortOrder };
+      ? { from: -1, _id: -1 }
+      : { from: -1, [sortField]: sortOrder, _id: sortOrder };
   } else if (sortField !== 'from') {
-    sortObj = { from: 1, [sortField]: sortOrder };
+    sortObj = { from: 1, [sortField]: sortOrder, _id: sortOrder };
   }
 
   // Calculate pagination
