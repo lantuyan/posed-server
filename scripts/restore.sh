@@ -290,7 +290,21 @@ if [ "$RESTORE_DATABASE" = true ]; then
     if [ -n "$MONGODB_URI" ]; then
         if command -v mongorestore &> /dev/null; then
             log_warning "This will DROP all existing data and restore from backup!"
-            mongorestore --uri="$MONGODB_URI" --drop "$EXTRACTED_FOLDER/mongo_dump" 2>&1 | tail -10
+            
+            # Find the database subdirectory inside mongo_dump
+            # mongodump creates: mongo_dump/<db_name>/ structure
+            DUMP_DIR="$EXTRACTED_FOLDER/mongo_dump"
+            DB_SUBDIR=$(find "$DUMP_DIR" -maxdepth 1 -mindepth 1 -type d | head -n 1)
+            
+            if [ -n "$DB_SUBDIR" ]; then
+                # Extract base URI without database name for clean restore
+                BASE_URI=$(echo "$MONGODB_URI" | sed 's|/[^/]*$||')
+                log_info "Restoring from: $DB_SUBDIR"
+                mongorestore --uri="$BASE_URI" --drop "$DUMP_DIR" 2>&1 | tail -10
+            else
+                # No subdirectory, restore directly (flat BSON files)
+                mongorestore --uri="$MONGODB_URI" --drop "$DUMP_DIR" 2>&1 | tail -10
+            fi
             log_success "Database restored"
         else
             log_error "mongorestore not found! Skipping database restore."
